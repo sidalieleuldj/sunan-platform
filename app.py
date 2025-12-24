@@ -14,42 +14,42 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. التصميم (CSS) المطور لدعم العربية مع بقاء اللوحة يساراً ---
+# --- 2. التصميم (CSS) المطور لإرجاع اللوحة لليسار ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* ضبط الخط والاتجاه العام للمحتوى */
+    /* 1. ضبط الخط والاتجاه العام للمحتوى */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
-        direction: rtl; /* النصوص من اليمين لليسار */
+        direction: rtl; 
     }
 
-    /* الحفاظ على لوحة التحكم في الجهة اليسرى (الوضع الافتراضي لستريمليت) */
-    section[data-testid="stSidebar"] {
-        direction: rtl; /* المحتوى داخل اللوحة يبقى يمين */
+    /* 2. إجبار القائمة الجانبية على البقاء في اليسار مهما كان اتجاه اللغة */
+    [data-testid="stSidebar"] {
+        left: 0 !important;
+        right: auto !important;
     }
-    
-    /* ضبط محاذاة العناوين والنصوص */
-    h1, h2, h3, h4, h5, p {
+
+    /* 3. تصحيح مكان زر فتح وإغلاق اللوحة */
+    [data-testid="stSidebarCollapsedControl"] {
+        left: 20px !important;
+        right: auto !important;
+    }
+
+    /* 4. ضمان محاذاة النصوص داخل اللوحة لليمين */
+    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] .stSlider {
+        direction: rtl;
         text-align: right;
     }
 
-    /* تحسين شكل الأزرار */
+    h1, h2, h3, h4, h5, p { text-align: right; }
+    
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
         color: white;
         border-radius: 8px;
-        font-weight: bold;
-        border: none;
-        padding: 0.5rem;
-    }
-    
-    /* تعديل تنسيق التنبيهات */
-    .stAlert {
-        direction: rtl;
-        text-align: right;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -232,3 +232,4 @@ if 'history_df' in st.session_state:
         st.dataframe(df.iloc[::-1], use_container_width=True)
     except:
         st.error("تأكد من أن ترتيب الأعمدة في Google Sheet صحيح (التاريخ ثم المؤشرات الثلاثة).")
+
