@@ -16,20 +16,19 @@ st.set_page_config(
 
 # --- 2. الاتصال بقاعدة البيانات (Google Sheets) ---
 def get_google_sheet():
-    # إعداد الاتصال
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds_dict = st.secrets["service_account"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    # 🚨 استبدل هذا بالكود الخاص بملفك ID
-    # تذكير: الكود هو الجزء الطويل في رابط الملف
-    sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" # <--- ضع كود ملفك هنا بدلاً من هذا
+    # تأكد أن هذا الـ ID هو الخاص بملفك
+    sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
     return client.open_by_key(sheet_id).sheet1
 
 def save_to_google_sheet(eff, def_score, coh, diagnosis):
     try:
         sheet = get_google_sheet()
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # يجب أن تتطابق هذه الأسماء مع رؤوس الأعمدة في ملفك
         row = [current_time, eff, def_score, coh, diagnosis]
         sheet.append_row(row)
         return True
@@ -40,159 +39,142 @@ def save_to_google_sheet(eff, def_score, coh, diagnosis):
 def load_history_data():
     try:
         sheet = get_google_sheet()
-        # جلب كل البيانات وتحويلها لجدول Pandas
         data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        return df
+        return pd.DataFrame(data)
     except Exception as e:
-        st.warning("⚠️ لا توجد بيانات كافية لعرض التاريخ، أو حدث خطأ في الاتصال.")
+        st.warning("⚠️ لم نتمكن من جلب السجل التاريخي.")
         return pd.DataFrame()
 
 # --- 3. التصميم (CSS) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"]  { font-family: 'Cairo', sans-serif; }
+    html, body, [class*="css"]  { font-family: 'Cairo', sans-serif; direction: rtl; }
     .stSidebar [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
-    .stMarkdown { direction: rtl; text-align: right; }
-    h1, h2, h3, h4, h5 { text-align: right; font-family: 'Cairo', sans-serif; color: #1F618D; }
-    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
-    /* تحسين شكل الجداول */
-    [data-testid="stDataFrame"] { direction: rtl; }
+    h1, h2, h3, h4, h5 { text-align: right; color: #1F618D; }
+    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. محرك السنن ---
+# --- 4. محرك السنن (المعادلات المحدثة) ---
 def calculate_sunan_scores(data):
-    # 1. حساب الفعالية - تطوير المعادلة لتكون أكثر توازناً
-    production_val = data['production_ratio'] * 100
-    projects_val = data['completed_projects'] * 20 # زيادة وزن المشروع المنجز
-    quality_mult = (data['quality_score'] / 5)
+    # الفعالية: توازن بين الإنتاج والوقت المستهلك
+    prod_weight = data['production_ratio'] * 60 
+    proj_weight = data['completed_projects'] * 15
+    quality_mod = (data['quality_score'] / 5)
+    time_penalty = (data['daily_hours'] * 2.5) # خصم بسيط عن كل ساعة تصفح
     
-    # معامل الوقت: كلما قل الوقت زادت الفعالية
-    time_factor = data['daily_hours'] if data['daily_hours'] > 0 else 1
+    eff = (prod_weight + proj_weight) * quality_mod - time_penalty
+    eff = max(min(round(eff + 20, 2), 100), 10) # +20 لضبط نقطة البداية
     
-    # المعادلة الجديدة
-    eff = ((production_val + projects_val) * quality_mult) / (time_factor * 0.5 + 1)
-    eff = min(round(eff, 2), 100)
-    
-    # 2. حساب المناعة
-    total_actions = data['original_posts'] + data['replies'] + 0.001
+    # المناعة
+    total_actions = data['original_posts'] + data['replies'] + 0.1
     indep_ratio = data['original_posts'] / total_actions
     stability = data['emotional_stability'] / 10.0
-    def_ = round((indep_ratio * 60) + (stability * 40), 2)
+    def_score = round((indep_ratio * 60) + (stability * 40), 2)
     
-    # 3. حساب التماسك
-    base = data['task_alignment'] * 10
-    mult = 1.2 if data['is_team'] else 1.0
-    coh = min(round(base * mult, 2), 100)
+    # التماسك
+    coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
-    # التشخيص المعتمد على الأولويات
-    if eff < 45: # رفعنا العتبة قليلاً للدقة
+    # التشخيص
+    if eff < 45:
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج. الزمن الرقمي يلتهم أثرك."
-        actions = ["صيام رقمي: اقطع الاتصال لمدة ساعتين يومياً.", "أنجز عملاً واحداً صغيراً للنهاية."]
-    elif def_ < 45:
+        acts = ["صيام رقمي لمدة ساعتين.", "أنجز مهمة واحدة صغيرة للنهاية."]
+    elif def_score < 45:
         diag = "⚠️ جهد مكشوف: طاقتك مستنزفة في ردود الأفعال ومعارك الآخرين."
-        actions = ["الانسحاب التكتيكي: لا ترد على أي تعليق اليوم.", "اكتب فكرتك الخاصة بدلاً من نقد أفكار الغير."]
+        acts = ["توقف عن الرد على التعليقات اليوم.", "اكتب فكرة أصلية بدلاً من النقد."]
     elif coh < 45:
         diag = "🧩 تشتت الجهد: جهدك فردي ولا يصب في هدفك الأكبر."
-        actions = ["راجع بوصلة أهدافك.", "اعرض عملك على صديق لفتح باب التعاون."]
+        acts = ["راجع أهدافك الأسبوعية.", "ابحث عن شريك لعمل مشترك."]
     else:
-        diag = "🌟 حالة متوازنة (الاستواء الحضاري): أنت تسير وفق السنن، حافظ على هذا الإيقاع."
-        actions = []
+        diag = "🌟 حالة متوازنة: أنت تسير وفق السنن الحضارية."
+        acts = []
         
-    return eff, def_, coh, diag, actions
+    return eff, def_score, coh, diag, acts
+
 # --- 5. واجهة المستخدم ---
+
+# تهيئة ذاكرة الجلسة
+if 'results' not in st.session_state:
+    st.session_state['results'] = None
+if 'show_history' not in st.session_state:
+    st.session_state['show_history'] = False
+
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
     st.header("🎛️ لوحة التحكم")
+    
     with st.expander("⏱️ 1. محور الفعالية", expanded=True):
         d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
         p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.1)
         projects = st.number_input("مشاريع منجزة", 0, 50, 0)
         quality = st.select_slider("جودة الأثر", options=[1, 2, 3, 4, 5], value=3)
+        
     with st.expander("🛡️ 2. محور المناعة"):
         orig = st.number_input("منشورات أصلية", 0, 50, 1)
         replies = st.number_input("ردود وتعليقات", 0, 100, 10)
         emotion = st.slider("الهدوء النفسي", 0, 10, 5)
+        
     with st.expander("🤝 3. محور التماسك"):
         align = st.slider("توافق مع الهدف", 0, 10, 5)
-        team = st.checkbox("أعمل ضمن فريق", value=False)
+        team = st.checkbox("أعمل ضمن فريق")
+        
     st.markdown("---")
+    # زر التحليل يقوم بتحديث النتائج في ذاكرة الجلسة فوراً
     calc_btn = st.button("🔍 تحليل الموقف")
 
 st.title("منصة السُّنَن الرقمية")
 
-# إدارة الجلسة
-if 'results' not in st.session_state:
-    st.session_state['results'] = None
-
 if calc_btn:
-    input_data = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects, 'quality_score': quality, 'original_posts': orig, 'replies': replies, 'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
+    input_data = {
+        'daily_hours': d_hours, 'production_ratio': p_ratio, 
+        'completed_projects': projects, 'quality_score': quality, 
+        'original_posts': orig, 'replies': replies, 
+        'emotional_stability': emotion, 'task_alignment': align, 'is_team': team
+    }
+    # إعادة الحساب ببيانات جديدة
     st.session_state['results'] = calculate_sunan_scores(input_data)
 
-# عرض النتائج الحالية
+# عرض النتائج
 if st.session_state['results']:
-    eff, def_, coh, diagnosis, rec_actions = st.session_state['results']
+    eff, def_s, coh, diag, acts = st.session_state['results']
     
     col_chart, col_text = st.columns([1.5, 1])
-    with col_chart:
-        categories = ['الفعالية', 'المناعة', 'التماسك']
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=[eff, def_, coh], theta=categories, fill='toself', name='مؤشرك', line_color='#1F618D'))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=20, b=20))
-        st.plotly_chart(fig, use_container_width=True)
-    with col_text:
-        st.success(diagnosis)
-        if rec_actions:
-            for act in rec_actions: st.warning(act)
     
-    if st.button("💾 حفظ النتيجة في السجل الحضاري"):
-        with st.spinner('جاري التدوين...'):
-            if save_to_google_sheet(eff, def_, coh, diagnosis):
-                st.balloons()
-                st.success("✅ تم حفظ النتيجة!")
+    with col_chart:
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=[eff, def_s, coh],
+            theta=['الفعالية', 'المناعة', 'التماسك'],
+            fill='toself',
+            line_color='#1F618D'
+        ))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=30, b=30))
+        st.plotly_chart(fig, use_container_width=True)
+        
+    with col_text:
+        st.subheader("📋 التشخيص الحضاري")
+        st.success(diag)
+        for a in acts:
+            st.warning(f"🔹 {a}")
+            
+    if st.button("💾 حفظ النتيجة في السجل"):
+        if save_to_google_sheet(eff, def_s, coh, diag):
+            st.balloons()
+            st.success("تم الحفظ بنجاح!")
 
 st.markdown("---")
 
-# --- القسم الجديد: سجل النمو التاريخي ---
+# --- 6. السجل التاريخي ---
 st.header("📈 سجل النمو التاريخي")
+if st.button("🔄 تحديث السجل التاريخي"):
+    st.session_state['history_df'] = load_history_data()
+    st.session_state['show_history'] = True
 
-with st.expander("اضغط هنا لعرض مسار تطورك عبر الزمن", expanded=False):
-    # زر لتحديث البيانات
-    if st.button("🔄 تحديث البيانات من السجل"):
-        st.session_state['history_df'] = load_history_data()
-
-    # عرض الرسم البياني إذا توفرت البيانات
+if st.session_state.get('show_history'):
     df = st.session_state.get('history_df', pd.DataFrame())
-    
     if not df.empty:
-        try:
-            # تنظيف البيانات للتأكد من أنها أرقام
-            df['date'] = pd.to_datetime(df['date'])
-            cols_to_plot = ['eff_score', 'def_score', 'coh_score']
-            
-            # رسم المخطط الخطي
-            fig_history = px.line(df, x='date', y=cols_to_plot, 
-                                  title='تطور مؤشراتك الحضارية عبر الزمن',
-                                  labels={'date': 'التاريخ', 'value': 'الدرجة (من 100)', 'variable': 'المؤشر'},
-                                  markers=True)
-            
-            # تخصيص الأسماء
-            new_names = {'eff_score': 'الفعالية', 'def_score': 'المناعة', 'coh_score': 'التماسك'}
-            fig_history.for_each_trace(lambda t: t.update(name = new_names[t.name],
-                                                          legendgroup = new_names[t.name],
-                                                          hovertemplate = t.hovertemplate.replace(t.name, new_names[t.name])
-                                                         ))
-            
-            st.plotly_chart(fig_history, use_container_width=True)
-            
-            # عرض الجدول الخام
-            st.dataframe(df.sort_values(by='date', ascending=False), use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"حدث خطأ في معالجة البيانات: {e}")
-            st.info("تأكد أن أسماء الأعمدة في Google Sheet هي بالإنجليزية: date, eff_score, def_score, coh_score")
-    else:
-        st.info("👈 اضغط زر 'تحديث البيانات' لجلب سجلك السابق.")
-
+        # رسم بياني للتطور
+        fig_hist = px.line(df, x=df.columns[0], y=df.columns[1:4], markers=True, title="مسار التطور")
+        st.plotly_chart(fig_hist, use_container_width=True)
+        st.dataframe(df.iloc[::-1], use_container_width=True)
