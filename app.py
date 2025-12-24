@@ -12,31 +12,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. دالة الاتصال بقاعدة البيانات (Google Sheets) ---
+# --- 2. دالة الاتصال بقاعدة البيانات ---
 def save_to_google_sheet(eff, def_score, coh, diagnosis):
     try:
-        # تعريف النطاق والصلاحيات
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # استدعاء المفاتيح من خزنة Secrets
+        # استدعاء المفاتيح من الخزنة
         creds_dict = st.secrets["service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        
-        # فتح الملف (تأكد أن الاسم يطابق اسم ملفك في جوجل شيت)
         sheet = client.open("sunan_db").sheet1
         
-        # تجهيز الصف الجديد (التاريخ + النتائج)
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         row = [current_time, eff, def_score, coh, diagnosis]
-        
-        # إضافة الصف
         sheet.append_row(row)
         return True
     except Exception as e:
-        st.error(f"خطأ في الاتصال بقاعدة البيانات: {e}")
+        st.error(f"⚠️ خطأ في الاتصال بقاعدة البيانات: {e}")
+        st.info("تأكد أنك أضفت الإيميل (client_email) الموجود في Secrets كمحرر (Editor) في ملف Google Sheet.")
         return False
 
-# --- 3. التصميم (CSS) ---
+# --- 3. التصميم ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
@@ -45,7 +40,6 @@ st.markdown("""
     .stMarkdown { direction: rtl; text-align: right; }
     h1, h2, h3 { text-align: right; font-family: 'Cairo', sans-serif; color: #1F618D; }
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
-    .stSlider [data-testid="stMarkdownContainer"] p { font-size: 16px; direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -100,16 +94,16 @@ with st.sidebar:
 
 st.title("منصة السُّنَن الرقمية")
 
-if 'result_saved' not in st.session_state:
-    st.session_state.result_saved = False
-
+# --- إدارة الذاكرة (Session State) ---
+# هذا الجزء الجديد يضمن بقاء النتائج بعد الضغط على زر الحفظ
 if calc_btn:
-    st.session_state.result_saved = False # تصفير الحالة عند التحليل الجديد
     input_data = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects, 'quality_score': quality, 'original_posts': orig, 'replies': replies, 'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
-    eff, def_, coh, diagnosis, rec_actions = calculate_sunan_scores(input_data)
-    
-    # حفظ النتائج مؤقتاً في الجلسة
-    st.session_state.last_results = (eff, def_, coh, diagnosis)
+    # تخزين النتائج في الذاكرة
+    st.session_state['results'] = calculate_sunan_scores(input_data)
+
+# فحص ما إذا كانت هناك نتائج محفوظة لعرضها
+if 'results' in st.session_state:
+    eff, def_, coh, diagnosis, rec_actions = st.session_state['results']
     
     col_chart, col_text = st.columns([1.5, 1])
     with col_chart:
@@ -122,14 +116,15 @@ if calc_btn:
         st.success(diagnosis)
         if rec_actions:
             for act in rec_actions: st.warning(act)
-            
-    # زر الحفظ في قاعدة البيانات
+    
     st.markdown("---")
+    # زر الحفظ الآن خارج شرط calc_btn وبالتالي سيعمل بشكل صحيح
     if st.button("💾 حفظ النتيجة في السجل الحضاري"):
-        if save_to_google_sheet(eff, def_, coh, diagnosis):
-            st.success("✅ تم حفظ نتيجتك بنجاح في قاعدة البيانات!")
-            st.session_state.result_saved = True
-            st.balloons()
-
+        with st.spinner('جاري الاتصال بالخزنة الرقمية...'):
+            success = save_to_google_sheet(eff, def_, coh, diagnosis)
+            if success:
+                st.balloons()
+                st.success("✅ تم التدوين! نتيجتك الآن محفوظة في سجلات السنن.")
+            # في حالة الفشل ستظهر رسالة الخطأ من الدالة نفسها
 else:
     st.info("👈 اضبط المؤشرات واضغط تحليل.")
