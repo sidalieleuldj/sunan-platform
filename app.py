@@ -102,97 +102,69 @@ def calculate_sunan_scores(data):
         actions = []
         
     return eff, def_, coh, diag, actions
-# --- 5. واجهة المستخدم ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
-    st.header("🎛️ لوحة التحكم")
-    with st.expander("⏱️ 1. محور الفعالية", expanded=True):
-        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
-        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.1)
-        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-        quality = st.select_slider("جودة الأثر", options=[1, 2, 3, 4, 5], value=3)
-    with st.expander("🛡️ 2. محور المناعة"):
-        orig = st.number_input("منشورات أصلية", 0, 50, 1)
-        replies = st.number_input("ردود وتعليقات", 0, 100, 10)
-        emotion = st.slider("الهدوء النفسي", 0, 10, 5)
-    with st.expander("🤝 3. محور التماسك"):
-        align = st.slider("توافق مع الهدف", 0, 10, 5)
-        team = st.checkbox("أعمل ضمن فريق", value=False)
-    st.markdown("---")
-    calc_btn = st.button("🔍 تحليل الموقف")
-
+# --- 5. واجهة المستخدم الرئيسية ---
 st.title("منصة السُّنَن الرقمية")
 
-# إدارة الجلسة
-if 'results' not in st.session_state:
-    st.session_state['results'] = None
-
+# التحقق من الضغط على زر التحليل
 if calc_btn:
-    input_data = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects, 'quality_score': quality, 'original_posts': orig, 'replies': replies, 'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
+    # 1. جمع البيانات الجديدة
+    input_data = {
+        'daily_hours': d_hours, 
+        'production_ratio': p_ratio, 
+        'completed_projects': projects, 
+        'quality_score': quality, 
+        'original_posts': orig, 
+        'replies': replies, 
+        'emotional_stability': emotion, 
+        'task_alignment': align, 
+        'is_team': team
+    }
+    
+    # 2. إعادة الحساب وتخزين النتيجة الجديدة (هذا يكسر الجمود)
     st.session_state['results'] = calculate_sunan_scores(input_data)
+    st.session_state['show_results'] = True
 
-# عرض النتائج الحالية
-if st.session_state['results']:
+# عرض النتائج إذا كانت موجودة في الذاكرة ومطلوب عرضها
+if st.session_state.get('show_results'):
     eff, def_, coh, diagnosis, rec_actions = st.session_state['results']
     
     col_chart, col_text = st.columns([1.5, 1])
+    
     with col_chart:
+        # رسم الرادار بالبيانات الجديدة
         categories = ['الفعالية', 'المناعة', 'التماسك']
         fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=[eff, def_, coh], theta=categories, fill='toself', name='مؤشرك', line_color='#1F618D'))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=20, b=20))
+        fig.add_trace(go.Scatterpolar(
+            r=[eff, def_, coh], 
+            theta=categories, 
+            fill='toself', 
+            name='مؤشرك', 
+            line_color='#1F618D'
+        ))
+        fig.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100])), 
+            margin=dict(t=20, b=20)
+        )
         st.plotly_chart(fig, use_container_width=True)
+        
     with col_text:
+        st.markdown("### 🩺 التشخيص الحالي")
         st.success(diagnosis)
         if rec_actions:
-            for act in rec_actions: st.warning(act)
+            for act in rec_actions: 
+                st.warning(act)
     
-    if st.button("💾 حفظ النتيجة في السجل الحضاري"):
-        with st.spinner('جاري التدوين...'):
-            if save_to_google_sheet(eff, def_, coh, diagnosis):
+    st.markdown("---")
+    
+    # زر الحفظ
+    if st.button("💾 حفظ هذه النتيجة في السجل الحضاري"):
+        with st.spinner('جاري التدوين في السجل...'):
+            success = save_to_google_sheet(eff, def_, coh, diagnosis)
+            if success:
                 st.balloons()
-                st.success("✅ تم حفظ النتيجة!")
+                st.success("✅ تم التدوين بنجاح!")
 
-st.markdown("---")
-
-# --- القسم الجديد: سجل النمو التاريخي ---
-st.header("📈 سجل النمو التاريخي")
-
-with st.expander("اضغط هنا لعرض مسار تطورك عبر الزمن", expanded=False):
-    # زر لتحديث البيانات
-    if st.button("🔄 تحديث البيانات من السجل"):
-        st.session_state['history_df'] = load_history_data()
-
-    # عرض الرسم البياني إذا توفرت البيانات
-    df = st.session_state.get('history_df', pd.DataFrame())
-    
-    if not df.empty:
-        try:
-            # تنظيف البيانات للتأكد من أنها أرقام
-            df['date'] = pd.to_datetime(df['date'])
-            cols_to_plot = ['eff_score', 'def_score', 'coh_score']
-            
-            # رسم المخطط الخطي
-            fig_history = px.line(df, x='date', y=cols_to_plot, 
-                                  title='تطور مؤشراتك الحضارية عبر الزمن',
-                                  labels={'date': 'التاريخ', 'value': 'الدرجة (من 100)', 'variable': 'المؤشر'},
-                                  markers=True)
-            
-            # تخصيص الأسماء
-            new_names = {'eff_score': 'الفعالية', 'def_score': 'المناعة', 'coh_score': 'التماسك'}
-            fig_history.for_each_trace(lambda t: t.update(name = new_names[t.name],
-                                                          legendgroup = new_names[t.name],
-                                                          hovertemplate = t.hovertemplate.replace(t.name, new_names[t.name])
-                                                         ))
-            
-            st.plotly_chart(fig_history, use_container_width=True)
-            
-            # عرض الجدول الخام
-            st.dataframe(df.sort_values(by='date', ascending=False), use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"حدث خطأ في معالجة البيانات: {e}")
-            st.info("تأكد أن أسماء الأعمدة في Google Sheet هي بالإنجليزية: date, eff_score, def_score, coh_score")
-    else:
-        st.info("👈 اضغط زر 'تحديث البيانات' لجلب سجلك السابق.")
-
+else:
+    # شاشة الانتظار الأصلية
+    st.info("👈 قم بضبط المؤشرات في القائمة الجانبية ثم اضغط 'تحليل الموقف'.")
+    st.image("https://img.freepik.com/free-vector/data-extraction-concept-illustration_114360-4876.jpg", width=400)
