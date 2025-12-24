@@ -1,9 +1,7 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 
-# --- 1. إعدادات الصفحة والهوية البصرية ---
+# --- 1. إعدادات الصفحة ---
 st.set_page_config(
     page_title="منصة السُّنَن الرقمية",
     page_icon="🕌",
@@ -11,56 +9,51 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. حقن CSS (تجميل الواجهة والخطوط) ---
+# --- 2. التصميم والخطوط (CSS) ---
 st.markdown("""
 <style>
-    /* استيراد خط 'Cairo' من جوجل */
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
 
-    /* تطبيق الخط على كامل التطبيق */
+    /* تعميم الخط والاتجاه */
     html, body, [class*="css"]  {
         font-family: 'Cairo', sans-serif;
-        direction: rtl; /* فرض الاتجاه من اليمين لليسار */
+    }
+    
+    /* ضبط اتجاه النصوص في القائمة الجانبية والرئيسية */
+    .stSidebar [data-testid="stMarkdownContainer"] {
+        direction: rtl;
+        text-align: right;
+    }
+    .stMarkdown {
+        direction: rtl;
+        text-align: right;
     }
     
     /* تنسيق العناوين */
     h1, h2, h3 {
-        color: #2E86C1; /* لون أزرق وقور */
-        font-weight: 700;
         text-align: right;
-    }
-
-    /* تنسيق النصوص العادية */
-    p, label {
-        text-align: right;
-        font-size: 18px;
+        font-family: 'Cairo', sans-serif;
+        color: #1F618D;
     }
 
     /* تنسيق الأزرار */
     .stButton>button {
-        background-color: #2E86C1;
-        color: white;
-        border-radius: 10px;
         width: 100%;
-        font-weight: bold;
-        font-size: 20px;
-        padding: 10px;
-    }
-    .stButton>button:hover {
-        background-color: #1B4F72;
+        background-color: #1F618D;
         color: white;
+        border-radius: 8px;
+        font-weight: bold;
     }
     
-    /* تنسيق الرسائل التحذيرية والمعلوماتية */
-    .stAlert {
+    /* إصلاح محاذاة النصوص داخل المدخلات */
+    .stSlider [data-testid="stMarkdownContainer"] p {
+        font-size: 16px;
         direction: rtl;
-        text-align: right;
-        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. محرك السنن (الخوارزميات) ---
+# --- 3. محرك السنن ---
 def calculate_sunan_scores(data):
     # معادلة الفعالية
     ratio_cons = 1.0 - data['production_ratio']
@@ -79,109 +72,96 @@ def calculate_sunan_scores(data):
     mult = 1.2 if data['is_team'] else 1.0
     coh = min(round(base * mult, 2), 100)
     
-    # التشخيص المنهجي
-    diag = "🌟 **حالة متوازنة (الاستواء الحضاري):** أنت تسير وفق السنن، حافظ على هذا الإيقاع."
+    # التشخيص
+    diag = "🌟 **حالة متوازنة:** تسير وفق السنن، حافظ على هذا الإيقاع."
     actions = []
     
     if eff < 40: 
-        diag = "🛑 **حالة (القابلية للتراكم):** تستهلك أكثر مما تنتج. الزمن الرقمي يلتهمك."
-        actions.append("صيام رقمي: اقطع الاتصال لمدة 4 ساعات يومياً.")
-        actions.append("مشروع صغير: أنجز عملاً واحداً (مقال، كود، تصميم) اليوم.")
+        diag = "🛑 **ركود حضاري:** تستهلك أكثر مما تنتج."
+        actions.append("خصص ساعة يومياً للعمل العميق بعيداً عن الهاتف.")
     elif def_ < 40:
-        diag = "⚠️ **حالة (الجهد المكشوف):** طاقتك مستنزفة في ردود الأفعال ومعارك الآخرين."
-        actions.append("الانسحاب التكتيكي: لا ترد على أي تعليق لمدة 3 أيام.")
-        actions.append("المبادرة: اكتب منشوراً واحداً يمثل فكرتك الخاصة.")
+        diag = "⚠️ **جهد مكشوف:** طاقتك مهدورة في ردود الأفعال."
+        actions.append("توقف عن النقاشات الجدلية لمدة 3 أيام.")
     elif coh < 40:
-        diag = "🧩 **حالة (التشتت):** جهدك فردي ولا يصب في تيار الأمة أو هدفك الأكبر."
-        actions.append("البحث عن شريك: اعرض فكرتك على صديق يشاركك الاهتمام.")
-        actions.append("بوصلة الأهداف: اكتب هدفك الأكبر وراجع مهامك اليومية بناءً عليه.")
+        diag = "🧩 **تشتت الجهد:** عمل فردي يفتقد للبوصلة."
+        actions.append("ابحث عن شريك يشاركك نفس الهدف.")
         
     return eff, def_, coh, diag, actions
 
-# --- 4. واجهة المستخدم (Layout) ---
+# --- 4. واجهة المستخدم ---
 
-# رأس الصفحة
-col_logo, col_title = st.columns([1, 4])
-with col_title:
-    st.title("منصة السُّنَن الرقمية")
-    st.markdown("**نحو هندسة حضارية لعصر ما بعد الطوفان الرقمي**")
-with col_logo:
-    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
-
-st.markdown("---")
-
-# التقسيم الرئيسي
-col_inputs, col_results = st.columns([1, 1.5], gap="large")
-
-with col_inputs:
-    st.markdown("### 🎛️ لوحة المؤشرات")
+# القائمة الجانبية (للمدخلات فقط)
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
+    st.header("🎛️ لوحة التحكم السننية")
     
-    with st.expander("⏱️ 1. محور الفعالية (الزمن والإنتاج)", expanded=True):
-        d_hours = st.slider("ساعات الاستخدام اليومي", 0.0, 16.0, 4.0, help="الوقت الكلي المقضي على الشاشات")
-        p_ratio = st.slider("نسبة الإنتاج %", 0.0, 1.0, 0.1, help="كم % من وقتك تقضيه في صناعة محتوى أو تعلم؟")
-        projects = st.number_input("المشاريع المنجزة (شهرياً)", 0, 50, 0)
+    st.info("قم بضبط المؤشرات هنا 👇")
+    
+    with st.expander("⏱️ 1. محور الفعالية", expanded=True):
+        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.1)
+        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
         quality = st.select_slider("جودة الأثر", options=[1, 2, 3, 4, 5], value=3)
 
-    with st.expander("🛡️ 2. محور المناعة (الاستقلال النفسي)"):
-        orig = st.number_input("منشورات/أفكار أصلية", 0, 50, 1)
-        replies = st.number_input("ردود وتعليقات جانبية", 0, 100, 10)
-        emotion = st.slider("مقياس الهدوء النفسي", 0, 10, 5, help="10 تعني هدوء تام، 0 تعني غضب وتوتر دائم")
+    with st.expander("🛡️ 2. محور المناعة"):
+        orig = st.number_input("منشورات أصلية", 0, 50, 1)
+        replies = st.number_input("ردود وتعليقات", 0, 100, 10)
+        emotion = st.slider("الهدوء النفسي", 0, 10, 5)
 
-    with st.expander("🤝 3. محور التماسك (العمل الجماعي)"):
-        align = st.slider("توافق المهام مع الرسالة", 0, 10, 5)
-        team = st.toggle("أعمل ضمن فريق/مشروع مشترك؟", value=False)
+    with st.expander("🤝 3. محور التماسك"):
+        align = st.slider("توافق مع الهدف", 0, 10, 5)
+        team = st.checkbox("أعمل ضمن فريق", value=False)
     
-    st.markdown("<br>", unsafe_allow_html=True)
-    calc_btn = st.button("🔍 تحليل الموقف الحضاري")
+    st.markdown("---")
+    calc_btn = st.button("🔍 تحليل الموقف")
 
-with col_results:
-    if calc_btn:
-        # الحساب
-        input_data = {
-            'daily_hours': d_hours, 'production_ratio': p_ratio,
-            'completed_projects': projects, 'quality_score': quality,
-            'original_posts': orig, 'replies': replies,
-            'emotional_stability': emotion, 'task_alignment': align,
-            'is_team': team
-        }
-        eff, def_, coh, diagnosis, rec_actions = calculate_sunan_scores(input_data)
-        
-        # عرض الرادار بتصميم محسن
-        st.markdown("### 📊 رادار التوازن")
-        
+# منطقة العرض الرئيسية (للنتائج فقط)
+st.title("منصة السُّنَن الرقمية")
+st.markdown("##### نحو هندسة حضارية لعصر ما بعد الطوفان الرقمي")
+
+if calc_btn:
+    # الحساب
+    input_data = {
+        'daily_hours': d_hours, 'production_ratio': p_ratio,
+        'completed_projects': projects, 'quality_score': quality,
+        'original_posts': orig, 'replies': replies,
+        'emotional_stability': emotion, 'task_alignment': align,
+        'is_team': team
+    }
+    eff, def_, coh, diagnosis, rec_actions = calculate_sunan_scores(input_data)
+    
+    # تقسيم النتائج
+    col_chart, col_text = st.columns([1.5, 1])
+    
+    with col_chart:
+        # الرسم البياني
         categories = ['الفعالية (التغيير)', 'المناعة (التدافع)', 'التماسك (الوحدة)']
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
             r=[eff, def_, coh],
             theta=categories,
             fill='toself',
-            name='مؤشرك الحالي',
-            line_color='#2E86C1',
-            fillcolor='rgba(46, 134, 193, 0.4)'
+            name='مؤشرك',
+            line_color='#1F618D'
         ))
-        
         fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 100]),
-            ),
-            showlegend=False,
-            margin=dict(l=40, r=40, t=20, b=20)
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+            margin=dict(t=20, b=20)
         )
         st.plotly_chart(fig, use_container_width=True)
+
+    with col_text:
+        st.markdown("### 🩺 التشخيص")
+        st.success(diagnosis)
         
-        # بطاقة التشخيص
-        st.success(diagnosis, icon="🩺")
-        
-        # خطة العمل
         if rec_actions:
-            st.markdown("### 🛠️ ما العمل؟ (الخطوة القادمة)")
+            st.markdown("### 🚀 خطة العمل")
             for act in rec_actions:
-                st.warning(f"**مهمة:** {act}", icon="🚀")
-                
-    else:
-        # شاشة الانتظار
-        st.info("👈 ابدأ بضبط المؤشرات على اليمين لترى موقعك في خريطة السنن.")
-        st.markdown("""
-        > **"إن قضية الحضارة لا تحل بتكديس المنتجات، بل بحل مشكلة الإنسان."**
-        > — *مالك بن نبي*
-        """)
+                st.warning(act)
+else:
+    # شاشة ترحيبية عند الفتح
+    st.image("https://img.freepik.com/free-vector/data-extraction-concept-illustration_114360-4876.jpg", width=400)
+    st.markdown("""
+    ### أهلاً بك في مختبر السنن..
+    ابدأ بتعديل الأرقام في **القائمة الجانبية** (يمين الشاشة) ثم اضغط **"تحليل الموقف"** لترى نتيجتك.
+    """)
