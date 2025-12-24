@@ -49,9 +49,23 @@ def load_history_data():
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"]  { font-family: 'Cairo', sans-serif; direction: rtl; }
-    .stSidebar [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    
+    /* جعل الخط كابرو وتغيير اتجاه النصوص فقط */
+    html, body, [class*="css"]  { 
+        font-family: 'Cairo', sans-serif; 
+        direction: rtl; /* اتجاه الكتابة من اليمين */
+    }
+
+    /* إجبار القائمة الجانبية على البقاء في اليسار */
+    [data-testid="stSidebar"] {
+        left: 0;
+        right: auto;
+        direction: rtl; /* محتوى القائمة يبقى يمين */
+    }
+    
+    /* محاذاة العناوين */
     h1, h2, h3, h4, h5 { text-align: right; color: #1F618D; }
+    
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
@@ -178,3 +192,4 @@ if st.session_state.get('show_history'):
         fig_hist = px.line(df, x=df.columns[0], y=df.columns[1:4], markers=True, title="مسار التطور")
         st.plotly_chart(fig_hist, use_container_width=True)
         st.dataframe(df.iloc[::-1], use_container_width=True)
+
