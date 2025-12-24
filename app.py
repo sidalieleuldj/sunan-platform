@@ -23,7 +23,7 @@ def get_google_sheet():
     client = gspread.authorize(creds)
     # 🚨 استبدل هذا بالكود الخاص بملفك ID
     # تذكير: الكود هو الجزء الطويل في رابط الملف
-    sheet_id = "1BxiMVs0X..." # <--- ضع كود ملفك هنا بدلاً من هذا
+    sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" # <--- ضع كود ملفك هنا بدلاً من هذا
     return client.open_by_key(sheet_id).sheet1
 
 def save_to_google_sheet(eff, def_score, coh, diagnosis):
@@ -185,3 +185,4 @@ with st.expander("اضغط هنا لعرض مسار تطورك عبر الزمن
             st.info("تأكد أن أسماء الأعمدة في Google Sheet هي بالإنجليزية: date, eff_score, def_score, coh_score")
     else:
         st.info("👈 اضغط زر 'تحديث البيانات' لجلب سجلك السابق.")
+
