@@ -20,7 +20,7 @@ def save_to_google_sheet(eff, def_score, coh, diagnosis):
         creds_dict = st.secrets["service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        sheet = client.open("sunan_db").sheet1
+        sheet = client.open_by_key("1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE").sheet1
         
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         row = [current_time, eff, def_score, coh, diagnosis]
@@ -128,3 +128,4 @@ if 'results' in st.session_state:
             # في حالة الفشل ستظهر رسالة الخطأ من الدالة نفسها
 else:
     st.info("👈 اضبط المؤشرات واضغط تحليل.")
+
