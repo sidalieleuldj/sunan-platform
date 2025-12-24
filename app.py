@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -12,34 +14,51 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. دالة الاتصال بقاعدة البيانات ---
+# --- 2. الاتصال بقاعدة البيانات (Google Sheets) ---
+def get_google_sheet():
+    # إعداد الاتصال
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds_dict = st.secrets["service_account"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    # 🚨 استبدل هذا بالكود الخاص بملفك ID
+    # تذكير: الكود هو الجزء الطويل في رابط الملف
+    sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" # <--- ضع كود ملفك هنا بدلاً من هذا
+    return client.open_by_key(sheet_id).sheet1
+
 def save_to_google_sheet(eff, def_score, coh, diagnosis):
     try:
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # استدعاء المفاتيح من الخزنة
-        creds_dict = st.secrets["service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key("1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE").sheet1
-        
+        sheet = get_google_sheet()
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         row = [current_time, eff, def_score, coh, diagnosis]
         sheet.append_row(row)
         return True
     except Exception as e:
-        st.error(f"⚠️ خطأ في الاتصال بقاعدة البيانات: {e}")
-        st.info("تأكد أنك أضفت الإيميل (client_email) الموجود في Secrets كمحرر (Editor) في ملف Google Sheet.")
+        st.error(f"⚠️ خطأ في الحفظ: {e}")
         return False
 
-# --- 3. التصميم ---
+def load_history_data():
+    try:
+        sheet = get_google_sheet()
+        # جلب كل البيانات وتحويلها لجدول Pandas
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        return df
+    except Exception as e:
+        st.warning("⚠️ لا توجد بيانات كافية لعرض التاريخ، أو حدث خطأ في الاتصال.")
+        return pd.DataFrame()
+
+# --- 3. التصميم (CSS) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     html, body, [class*="css"]  { font-family: 'Cairo', sans-serif; }
     .stSidebar [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
     .stMarkdown { direction: rtl; text-align: right; }
-    h1, h2, h3 { text-align: right; font-family: 'Cairo', sans-serif; color: #1F618D; }
+    h1, h2, h3, h4, h5 { text-align: right; font-family: 'Cairo', sans-serif; color: #1F618D; }
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
+    /* تحسين شكل الجداول */
+    [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,15 +113,16 @@ with st.sidebar:
 
 st.title("منصة السُّنَن الرقمية")
 
-# --- إدارة الذاكرة (Session State) ---
-# هذا الجزء الجديد يضمن بقاء النتائج بعد الضغط على زر الحفظ
+# إدارة الجلسة
+if 'results' not in st.session_state:
+    st.session_state['results'] = None
+
 if calc_btn:
     input_data = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects, 'quality_score': quality, 'original_posts': orig, 'replies': replies, 'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
-    # تخزين النتائج في الذاكرة
     st.session_state['results'] = calculate_sunan_scores(input_data)
 
-# فحص ما إذا كانت هناك نتائج محفوظة لعرضها
-if 'results' in st.session_state:
+# عرض النتائج الحالية
+if st.session_state['results']:
     eff, def_, coh, diagnosis, rec_actions = st.session_state['results']
     
     col_chart, col_text = st.columns([1.5, 1])
@@ -117,15 +137,51 @@ if 'results' in st.session_state:
         if rec_actions:
             for act in rec_actions: st.warning(act)
     
-    st.markdown("---")
-    # زر الحفظ الآن خارج شرط calc_btn وبالتالي سيعمل بشكل صحيح
     if st.button("💾 حفظ النتيجة في السجل الحضاري"):
-        with st.spinner('جاري الاتصال بالخزنة الرقمية...'):
-            success = save_to_google_sheet(eff, def_, coh, diagnosis)
-            if success:
+        with st.spinner('جاري التدوين...'):
+            if save_to_google_sheet(eff, def_, coh, diagnosis):
                 st.balloons()
-                st.success("✅ تم التدوين! نتيجتك الآن محفوظة في سجلات السنن.")
-            # في حالة الفشل ستظهر رسالة الخطأ من الدالة نفسها
-else:
-    st.info("👈 اضبط المؤشرات واضغط تحليل.")
+                st.success("✅ تم حفظ النتيجة!")
 
+st.markdown("---")
+
+# --- القسم الجديد: سجل النمو التاريخي ---
+st.header("📈 سجل النمو التاريخي")
+
+with st.expander("اضغط هنا لعرض مسار تطورك عبر الزمن", expanded=False):
+    # زر لتحديث البيانات
+    if st.button("🔄 تحديث البيانات من السجل"):
+        st.session_state['history_df'] = load_history_data()
+
+    # عرض الرسم البياني إذا توفرت البيانات
+    df = st.session_state.get('history_df', pd.DataFrame())
+    
+    if not df.empty:
+        try:
+            # تنظيف البيانات للتأكد من أنها أرقام
+            df['date'] = pd.to_datetime(df['date'])
+            cols_to_plot = ['eff_score', 'def_score', 'coh_score']
+            
+            # رسم المخطط الخطي
+            fig_history = px.line(df, x='date', y=cols_to_plot, 
+                                  title='تطور مؤشراتك الحضارية عبر الزمن',
+                                  labels={'date': 'التاريخ', 'value': 'الدرجة (من 100)', 'variable': 'المؤشر'},
+                                  markers=True)
+            
+            # تخصيص الأسماء
+            new_names = {'eff_score': 'الفعالية', 'def_score': 'المناعة', 'coh_score': 'التماسك'}
+            fig_history.for_each_trace(lambda t: t.update(name = new_names[t.name],
+                                                          legendgroup = new_names[t.name],
+                                                          hovertemplate = t.hovertemplate.replace(t.name, new_names[t.name])
+                                                         ))
+            
+            st.plotly_chart(fig_history, use_container_width=True)
+            
+            # عرض الجدول الخام
+            st.dataframe(df.sort_values(by='date', ascending=False), use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"حدث خطأ في معالجة البيانات: {e}")
+            st.info("تأكد أن أسماء الأعمدة في Google Sheet هي بالإنجليزية: date, eff_score, def_score, coh_score")
+    else:
+        st.info("👈 اضغط زر 'تحديث البيانات' لجلب سجلك السابق.")
