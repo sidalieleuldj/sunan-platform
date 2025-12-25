@@ -28,13 +28,6 @@ st.markdown("""
         text-align: right !important; direction: rtl !important;
     }
     
-    /* ضبط محاذاة "Label" في المتركس لتكون يمين */
-    div[data-testid="stMetricLabel"] {
-        text-align: right !important;
-        width: 100%;
-        direction: rtl;
-    }
-
     /* ضبط السلايدر */
     .stSlider > label {
         width: 100%; text-align: right !important; direction: rtl !important; display: block;
@@ -76,10 +69,8 @@ def smart_fix_score(val):
     try:
         s_val = str(val).replace(',', '.')
         score = float(s_val)
-        if score > 100: # إصلاح مشكلة اختفاء الفاصلة
-            score = score / 10
-        if score > 100: # حد أقصى
-            score = 100.0
+        if score > 100: score = score / 10 # إصلاح الفاصلة الضائعة
+        if score > 100: score = 100.0 # سقف النتيجة
         return score
     except:
         return 0.0
@@ -189,27 +180,53 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (التعديل المطلوب) ---
+# --- 6. لوحة المتصدرين (بتصميم الجدول الأنيق) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            st.dataframe(df.tail(5), use_container_width=True)
+            # 1. عرض السجل الكامل (اختياري، في الأسفل)
+            with st.expander("📂 عرض سجل البيانات التفصيلي"):
+                st.dataframe(df, use_container_width=True)
             
+            # 2. جدول المتصدرين المخصص
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
-                c1, c2, c3 = st.columns(3)
+                # إعداد كود HTML للجدول
+                html_table = """
+                <table style="width:100%; direction: rtl; text-align: right; border-collapse: collapse; font-family: 'Cairo', sans-serif;">
+                  <thead>
+                    <tr style="background-color: #f0f2f6; border-bottom: 2px solid #1F618D;">
+                      <th style="padding: 10px; color: #1F618D;">المركز</th>
+                      <th style="padding: 10px; color: #1F618D;">الاسم</th>
+                      <th style="padding: 10px; color: #1F618D;">الفعالية</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                """
                 
-                # ✅ هنا التغيير: الاسم في الأعلى (label)، والنتيجة في الأسفل (value)
-                if len(leaderboard) > 0: 
-                    c1.metric(label=f"🥇 {leaderboard.index[0]}", value=f"{leaderboard.iloc[0]:.1f}%")
-                if len(leaderboard) > 1: 
-                    c2.metric(label=f"🥈 {leaderboard.index[1]}", value=f"{leaderboard.iloc[1]:.1f}%")
-                if len(leaderboard) > 2: 
-                    c3.metric(label=f"🥉 {leaderboard.index[2]}", value=f"{leaderboard.iloc[2]:.1f}%")
+                medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
+                
+                # تعبئة الجدول
+                for i, (name, score) in enumerate(leaderboard.items()):
+                    medal = medals[i] if i < 3 else f"{i+1}"
+                    row_color = "#ffffff" # خلفية بيضاء
+                    html_table += f"""
+                    <tr style="background-color: {row_color}; border-bottom: 1px solid #ddd;">
+                      <td style="padding: 12px; font-weight: bold;">{medal}</td>
+                      <td style="padding: 12px;">{name}</td>
+                      <td style="padding: 12px; font-weight: bold; color: #2e7bcf;">{score:.1f}%</td>
+                    </tr>
+                    """
+                
+                html_table += "</tbody></table>"
+                
+                # عرض الجدول
+                st.markdown(html_table, unsafe_allow_html=True)
+                
         except Exception as e:
             st.error(f"خطأ: {e}")
     else:
