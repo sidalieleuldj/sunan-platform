@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS (التصميم) ---
+# --- 2. CSS (التصميم المستقر) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
@@ -28,10 +28,17 @@ st.markdown("""
         text-align: right !important; direction: rtl !important;
     }
     
-    /* جعل الأعمدة (Columns) تدعم اليمين لليسار */
-    div[data-testid="column"] {
+    /* جعل الجداول الأصلية يمين */
+    div[data-testid="stTable"] {
+        direction: rtl;
+        text-align: right;
+    }
+    table {
+        width: 100%;
         text-align: right !important;
-        direction: rtl !important;
+    }
+    th, td {
+        text-align: right !important;
     }
     
     /* السلايدر */
@@ -186,7 +193,7 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (تصميم الأعمدة الأصلي - لا يمكن أن ينكسر) ---
+# --- 6. لوحة المتصدرين (الطريقة الأصلية - st.table) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
@@ -199,36 +206,26 @@ if st.button("🔄 تحديث القائمة"):
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
-                # العنوان (الترويسة)
-                st.markdown("#### 🌟 أعلى النتائج")
+                # --- بناء جدول بيانات خاص للعرض ---
+                # سنقوم بإنشاء "قائمة" جديدة ونعرضها كجدول ثابت
                 
-                # --- بناء الجدول باستخدام الأعمدة (Columns) ---
-                # هذا الأسلوب لا يستخدم HTML وبالتالي لا يمكن أن يفشل
-                
-                # ترويسة الجدول
-                h1, h2, h3 = st.columns([1, 2, 1])
-                h1.markdown("**المركز**")
-                h2.markdown("**الاسم**")
-                h3.markdown("**الفعالية**")
-                st.markdown("---")
-                
+                display_data = []
                 medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
                 
                 for i, (name, score) in enumerate(leaderboard.items()):
-                    # تجهيز البيانات
-                    rank_text = medals[i] if i < 3 else f"{i+1}"
-                    score_text = f"{score:.1f}%"
-                    
-                    # إنشاء صف جديد
-                    c1, c2, c3 = st.columns([1, 2, 1])
-                    
-                    # تعبئة البيانات في الأعمدة
-                    with c1: st.markdown(f"**{rank_text}**")
-                    with c2: st.markdown(f"{name}")
-                    with c3: st.markdown(f"**{score_text}**")
-                    
-                    # خط فاصل خفيف
-                    st.divider()
+                    rank = medals[i] if i < 3 else f"{i+1}"
+                    # إضافة صف (Dictionary)
+                    display_data.append({
+                        "المركز": rank,
+                        "الاسم": name,
+                        "النتيجة (الفعالية)": f"{score:.1f}%"
+                    })
+                
+                # تحويل القائمة إلى DataFrame للعرض
+                view_df = pd.DataFrame(display_data)
+                
+                # استخدام st.table (أفضل للعرض الثابت من dataframe)
+                st.table(view_df)
                 
         except Exception as e:
             st.error(f"حدث خطأ أثناء العرض: {e}")
