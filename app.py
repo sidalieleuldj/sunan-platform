@@ -28,6 +28,23 @@ st.markdown("""
         text-align: right !important; direction: rtl !important;
     }
     
+    /* جعل جداول المارك داون تأخذ اتجاه اليمين وتملأ العرض */
+    table {
+        width: 100% !important;
+        direction: rtl !important;
+        text-align: right !important;
+        border-collapse: collapse !important;
+    }
+    th, td {
+        text-align: right !important;
+        padding: 10px !important;
+        border-bottom: 1px solid #ddd !important;
+    }
+    th {
+        background-color: #f0f2f6 !important;
+        color: #1F618D !important;
+    }
+    
     /* السلايدر */
     .stSlider > label {
         width: 100%; text-align: right !important; direction: rtl !important; display: block;
@@ -180,7 +197,7 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (تم إصلاح الجدول) ---
+# --- 6. لوحة المتصدرين (النسخة المضمونة - Markdown Table) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
@@ -193,46 +210,20 @@ if st.button("🔄 تحديث القائمة"):
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
-                # --- بداية كود الجدول ---
-                # نفتح وسم الجدول
-                table_html = """
-                <div style="direction: rtl; text-align: right;">
-                <table style="width:100%; border-collapse: collapse; border: 1px solid #ddd; font-family: 'Cairo', sans-serif;">
-                  <thead style="background-color: #f2f2f2;">
-                    <tr>
-                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">المركز</th>
-                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">الاسم</th>
-                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">الفعالية</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                # --- إنشاء جدول أنيق باستخدام Markdown الآمن ---
+                md_table = """
+                | المركز | الاسم | الفعالية |
+                | :--- | :--- | :--- |
                 """
                 
                 medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
                 
-                # إضافة الصفوف
                 for i, (name, score) in enumerate(leaderboard.items()):
-                    rank_display = medals[i] if i < 3 else f"{i+1}"
-                    
-                    # هنا نضيف الصف بشكل آمن
-                    table_html += f"""
-                    <tr style="background-color: white; border-bottom: 1px solid #ddd;">
-                      <td style="padding: 12px; font-weight: bold;">{rank_display}</td>
-                      <td style="padding: 12px;">{name}</td>
-                      <td style="padding: 12px; font-weight: bold; color: #2e7bcf;">{score:.1f}%</td>
-                    </tr>
-                    """
-
-                # إغلاق الجدول
-                table_html += """
-                  </tbody>
-                </table>
-                </div>
-                """
-                # --- نهاية كود الجدول ---
+                    rank = medals[i] if i < 3 else f"{i+1}"
+                    # إضافة الصف للجدول
+                    md_table += f"| {rank} | {name} | **{score:.1f}%** |\n"
                 
-                # عرض الجدول باستخدام markdown
-                st.markdown(table_html, unsafe_allow_html=True)
+                st.markdown(md_table)
                 
         except Exception as e:
             st.error(f"حدث خطأ أثناء العرض: {e}")
