@@ -13,22 +13,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS (التصميم المستقر) ---
+# --- 2. CSS (التصميم) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
     html, body, [class*="css"] { font-family: 'Cairo', sans-serif; }
     
-    /* الحفاظ على الهيكل LTR */
+    /* اتجاه التطبيق LTR لمنع المشاكل التقنية */
     .stApp { direction: ltr; }
 
-    /* تعريب النصوص والعناوين */
+    /* تعريب النصوص */
     .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert, .stDataFrame {
         text-align: right !important; direction: rtl !important;
     }
     
-    /* ضبط السلايدر */
+    /* السلايدر */
     .stSlider > label {
         width: 100%; text-align: right !important; direction: rtl !important; display: block;
     }
@@ -69,8 +69,8 @@ def smart_fix_score(val):
     try:
         s_val = str(val).replace(',', '.')
         score = float(s_val)
-        if score > 100: score = score / 10 # إصلاح الفاصلة الضائعة
-        if score > 100: score = 100.0 # سقف النتيجة
+        if score > 100: score = score / 10
+        if score > 100: score = 100.0
         return score
     except:
         return 0.0
@@ -180,29 +180,29 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (بتصميم الجدول الأنيق) ---
+# --- 6. لوحة المتصدرين (تم إصلاح الجدول) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            # 1. عرض السجل الكامل (اختياري، في الأسفل)
             with st.expander("📂 عرض سجل البيانات التفصيلي"):
                 st.dataframe(df, use_container_width=True)
             
-            # 2. جدول المتصدرين المخصص
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
-                # إعداد كود HTML للجدول
-                html_table = """
-                <table style="width:100%; direction: rtl; text-align: right; border-collapse: collapse; font-family: 'Cairo', sans-serif;">
-                  <thead>
-                    <tr style="background-color: #f0f2f6; border-bottom: 2px solid #1F618D;">
-                      <th style="padding: 10px; color: #1F618D;">المركز</th>
-                      <th style="padding: 10px; color: #1F618D;">الاسم</th>
-                      <th style="padding: 10px; color: #1F618D;">الفعالية</th>
+                # --- بداية كود الجدول ---
+                # نفتح وسم الجدول
+                table_html = """
+                <div style="direction: rtl; text-align: right;">
+                <table style="width:100%; border-collapse: collapse; border: 1px solid #ddd; font-family: 'Cairo', sans-serif;">
+                  <thead style="background-color: #f2f2f2;">
+                    <tr>
+                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">المركز</th>
+                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">الاسم</th>
+                      <th style="padding: 12px; text-align: right; border-bottom: 2px solid #1F618D; color: #1F618D;">الفعالية</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -210,24 +210,31 @@ if st.button("🔄 تحديث القائمة"):
                 
                 medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
                 
-                # تعبئة الجدول
+                # إضافة الصفوف
                 for i, (name, score) in enumerate(leaderboard.items()):
-                    medal = medals[i] if i < 3 else f"{i+1}"
-                    row_color = "#ffffff" # خلفية بيضاء
-                    html_table += f"""
-                    <tr style="background-color: {row_color}; border-bottom: 1px solid #ddd;">
-                      <td style="padding: 12px; font-weight: bold;">{medal}</td>
+                    rank_display = medals[i] if i < 3 else f"{i+1}"
+                    
+                    # هنا نضيف الصف بشكل آمن
+                    table_html += f"""
+                    <tr style="background-color: white; border-bottom: 1px solid #ddd;">
+                      <td style="padding: 12px; font-weight: bold;">{rank_display}</td>
                       <td style="padding: 12px;">{name}</td>
                       <td style="padding: 12px; font-weight: bold; color: #2e7bcf;">{score:.1f}%</td>
                     </tr>
                     """
+
+                # إغلاق الجدول
+                table_html += """
+                  </tbody>
+                </table>
+                </div>
+                """
+                # --- نهاية كود الجدول ---
                 
-                html_table += "</tbody></table>"
-                
-                # عرض الجدول
-                st.markdown(html_table, unsafe_allow_html=True)
+                # عرض الجدول باستخدام markdown
+                st.markdown(table_html, unsafe_allow_html=True)
                 
         except Exception as e:
-            st.error(f"خطأ: {e}")
+            st.error(f"حدث خطأ أثناء العرض: {e}")
     else:
         st.info("السجل فارغ.")
