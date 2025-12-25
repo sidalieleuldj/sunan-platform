@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import re # استيراد مكتبة التعامل مع النصوص المتقدمة
 
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(
@@ -13,47 +14,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS (النسخة الآمنة للمظهر) ---
+# --- 2. CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Cairo', sans-serif;
-    }
-
-    /* إبقاء اتجاه الصفحة LTR لمنع مشاكل العرض، مع تعريب النصوص */
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; }
     .stApp { direction: ltr; }
-
     .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
-        text-align: right !important;
-        direction: rtl !important;
+        text-align: right !important; direction: rtl !important;
     }
-    
     .stSlider > label {
-        width: 100%;
-        text-align: right !important;
-        direction: rtl !important;
-        display: block;
+        width: 100%; text-align: right !important; direction: rtl !important; display: block;
     }
-    
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
-        text-align: right !important;
-        direction: rtl !important;
+        text-align: right !important; direction: rtl !important;
     }
-    
-    input {
-        text-align: right !important;
-        direction: rtl !important;
-    }
-
-    .stButton>button {
-        width: 100%;
-        background-color: #1F618D;
-        color: white;
-        border-radius: 8px;
-    }
-    
+    input { text-align: right !important; direction: rtl !important; }
+    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
     [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
@@ -67,16 +44,15 @@ def get_google_sheet():
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
-    except:
-        return None
+    except: return None
 
 def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            # نقوم بتخزين الأرقام كنصوص مع نقطة لضمان الدقة مستقبلاً
+            # نحفظ الأرقام كنصوص مع استبدال النقطة بفاصلة لكي يقرأها جوجل شيت بشكل جميل
             row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                   str(eff).replace('.', ','), # تخزينها بفاصلة في جوجل شيت إذا كنت تفضل ذلك للعرض
+                   str(eff).replace('.', ','), 
                    str(def_score).replace('.', ','), 
                    str(coh).replace('.', ','), 
                    diagnosis]
@@ -85,7 +61,22 @@ def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
         except: return False
     return False
 
-# --- دالة جلب البيانات (تم التعديل هنا لحل المشكلة) ---
+# --- دالة التنظيف "النووية" للبيانات ---
+def clean_currency(x):
+    """دالة تحول أي نص رقمي (بفاصلة أو نقطة) إلى رقم عشري حقيقي"""
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str):
+        # استبدال الفاصلة بالنقطة
+        x = x.replace(',', '.')
+        # إزالة أي رموز غير رقمية ما عدا النقطة
+        # (في حال وجود مسافات أو رموز عملة)
+        try:
+            return float(x)
+        except:
+            return 0.0
+    return 0.0
+
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
@@ -94,20 +85,14 @@ def load_history_data():
             df = pd.DataFrame(data)
             
             if not df.empty:
-                # الأعمدة التي تحتوي على أرقام
                 cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
-                
                 for c in cols:
                     if c in df.columns:
-                        # 1. نحول العمود كله لنص (String)
-                        # 2. نستبدل الفاصلة (,) بالنقطة (.)
-                        # 3. نحوله لرقم (Numeric)
-                        df[c] = df[c].astype(str).str.replace(',', '.', regex=False)
-                        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
-                        
+                        # تطبيق دالة التنظيف على كل خلية في أعمدة الدرجات
+                        df[c] = df[c].apply(clean_currency)
             return df
         except Exception as e:
-            st.error(f"خطأ في معالجة البيانات: {e}")
+            st.error(f"خطأ البيانات: {e}")
     return pd.DataFrame()
 
 # --- 4. محرك السنن ---
@@ -192,7 +177,6 @@ if st.session_state['res']:
             
     if st.button("💾 تدوين النتيجة"):
         if user_name and user_name != "مبادر":
-            # نمرر القيم كما هي، ودالة الحفظ ستحولها لشكل مناسب
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
                 st.balloons(); st.success(f"تم التسجيل لـ {user_name}")
         else:
@@ -207,21 +191,19 @@ if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            # عرض البيانات (للتأكد أن الفاصلة اختفت)
             st.dataframe(df.tail(5), use_container_width=True)
             
-            # حساب المتصدرين
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
+                # ترتيب تنازلي حقيقي بعد التنظيف
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
                 c1, c2, c3 = st.columns(3)
                 if len(leaderboard) > 0: 
-                    # عرض الرقم بفاصلة عشرية واحدة للتجميل
-                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.1f}%")
+                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.2f}")
                 if len(leaderboard) > 1: 
-                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.1f}%")
+                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.2f}")
                 if len(leaderboard) > 2: 
-                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.1f}%")
+                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.2f}")
         except Exception as e:
             st.error(f"خطأ: {e}")
     else:
