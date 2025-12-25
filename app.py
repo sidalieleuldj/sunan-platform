@@ -182,4 +182,6 @@ if st.session_state['res']:
         st.subheader(f"نتيجة: {user_name}")
         st.info(diag)
         if acts:
-            for a in acts: st.warning
+            # 👇 هنا كان الخطأ، تأكد أن السطر مكتوب هكذا
+            for a in acts: st.warning(f"💡 {a}")
+
