@@ -19,29 +19,25 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* 1. جعل الهيكل العام LTR لتثبيت اللوحة يساراً ومنع الأخطاء */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
     
-    /* 2. تحويل النصوص والعناصر الداخلية للعربية (يمين) */
     .stMarkdown, .stTextInput > label, .stNumberInput > label, .stSelectbox > label, p, h1, h2, h3, h4, h5 {
         text-align: right !important;
         direction: rtl !important;
     }
 
-    /* 3. إصلاح مشكلة الأرقام الطائرة في السلايدر */
     div[data-testid="stSlider"] {
-        direction: ltr !important; /* الشريط يبقى يسار */
+        direction: ltr !important;
     }
     div[data-testid="stSlider"] > label {
-        text-align: right !important; /* العنوان يذهب يمين */
+        text-align: right !important;
         direction: rtl !important;
         width: 100%;
         display: block;
     }
     
-    /* 4. تثبيت القائمة الجانبية في اليسار مع محتوى عربي */
     section[data-testid="stSidebar"] {
         left: 0 !important;
         right: auto !important;
@@ -50,7 +46,6 @@ st.markdown("""
         text-align: right !important;
     }
 
-    /* 5. تنسيق الأزرار وحقول الإدخال */
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
@@ -62,13 +57,11 @@ st.markdown("""
         direction: rtl !important;
     }
     
-    /* 6. تحسين التنبيهات */
     .stAlert {
         direction: rtl !important;
         text-align: right !important;
     }
     
-    /* 7. تنسيق الجدول */
     [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
@@ -80,7 +73,6 @@ def get_google_sheet():
         creds_dict = st.secrets["service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # 🚨 تأكد من الـ ID الصحيح
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except:
@@ -105,7 +97,7 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-# --- 4. محرك السنن (المعادلة الموزونة مع تحديث نصائح المتفوقين) ---
+# --- 4. محرك السنن (مع التحديث الجديد للحالة 4) ---
 def calculate_sunan_scores(data):
     # معادلة الفعالية
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
@@ -114,8 +106,8 @@ def calculate_sunan_scores(data):
     eff = max(min(round(eff, 2), 100), 5)
     
     # المناعة
-    total_actions = data['original_posts'] + data['replies'] + 0.1
-    def_s = round(((data['original_posts'] / total_actions) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
+    total = data['original_posts'] + data['replies'] + 0.1
+    def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
     
     # التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
@@ -131,7 +123,7 @@ def calculate_sunan_scores(data):
         diag = "🧩 تشتت الجهد: ذرة قوية لكن منعزلة."
         acts = ["ابحث عن شريك.", "اربط عملك بهدف."]
     else: 
-        # --- التحديث الجديد هنا ---
+        # --- التحديث الجديد (الحالة المتوازنة) ---
         diag = "🌟 حالة متوازنة (الاستواء الحضاري): أنت الآن في مرحلة العطاء."
         acts = [
             "زكاة العلم تعليمه: تبنَّ شخصاً مبتدئاً ووجهه.",
@@ -139,6 +131,7 @@ def calculate_sunan_scores(data):
         ]
         
     return eff, def_s, coh, diag, acts
+
 # --- 5. واجهة المستخدم ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
@@ -190,7 +183,6 @@ if st.session_state['res']:
     with col_info:
         st.subheader(f"نتيجة: {user_name}")
         st.info(diag)
-        # --- ✅ هنا كان الخطأ وتم إصلاحه ---
         if acts:
             for a in acts: st.warning(f"💡 {a}")
             
@@ -219,9 +211,3 @@ if st.button("🔄 تحديث القائمة"):
         except:
             st.warning("تأكد من وجود الأعمدة (Name, Score_Eff) في ملف البيانات.")
             st.dataframe(df)
-
-
-
-
-
-
