@@ -14,41 +14,38 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. التصميم (CSS) - الحل الذكي (Fix) ---
+# --- 2. التصميم (CSS) - الحل النهائي الشامل ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* 1. ضبط الخط العام */
+    /* 1. جعل الهيكل العام LTR لتثبيت اللوحة يساراً ومنع الأخطاء */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
-
-    /* 2. الحفاظ على الهيكل LTR لمنع تكسر السلايدر، ولكن محاذاة النصوص لليمين */
-    .stMarkdown, .stTextInput > label, .stNumberInput > label, .stSlider > label, .stSelectbox > label, p, h1, h2, h3, h4, h5 {
+    
+    /* 2. تحويل النصوص والعناصر الداخلية للعربية (يمين) */
+    .stMarkdown, .stTextInput > label, .stNumberInput > label, .stSelectbox > label, p, h1, h2, h3, h4, h5 {
         text-align: right !important;
         direction: rtl !important;
     }
 
-    /* 3. إصلاح خاص للـ Sliders (المشكلة التي في الصورة) */
-    /* نجعل الحاوية LTR لكي لا تطير الأرقام، ولكن النص فوقها يمين */
+    /* 3. إصلاح مشكلة الأرقام الطائرة في السلايدر */
     div[data-testid="stSlider"] {
-        direction: ltr !important; 
+        direction: ltr !important; /* الشريط يبقى يسار */
     }
-    /* محاذاة التسمية (Label) لليمين */
     div[data-testid="stSlider"] > label {
-        text-align: right !important;
+        text-align: right !important; /* العنوان يذهب يمين */
+        direction: rtl !important;
         width: 100%;
         display: block;
-        direction: rtl !important;
     }
     
-    /* 4. القائمة الجانبية: تبقى يساراً، ولكن محتواها يمين */
+    /* 4. تثبيت القائمة الجانبية في اليسار مع محتوى عربي */
     section[data-testid="stSidebar"] {
         left: 0 !important;
         right: auto !important;
     }
-    /* محاذاة النصوص داخل القائمة الجانبية */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
         text-align: right !important;
     }
@@ -62,13 +59,17 @@ st.markdown("""
     }
     input {
         text-align: right !important;
+        direction: rtl !important;
     }
     
-    /* 6. تحسين شكل التنبيهات */
+    /* 6. تحسين التنبيهات */
     .stAlert {
         direction: rtl !important;
         text-align: right !important;
     }
+    
+    /* 7. تنسيق الجدول */
+    [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -79,7 +80,7 @@ def get_google_sheet():
         creds_dict = st.secrets["service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # تأكد من الـ ID الصحيح
+        # 🚨 تأكد من الـ ID الصحيح
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except:
@@ -106,16 +107,21 @@ def load_history_data():
 
 # --- 4. محرك السنن ---
 def calculate_sunan_scores(data):
+    # معادلة الفعالية (نظام الخصم والتعويض)
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
+    # معادلة محسنة لضمان عدم انهيار الرقم
     eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
     eff = max(min(round(eff, 2), 100), 5)
     
+    # المناعة
     total = data['original_posts'] + data['replies'] + 0.1
     def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
     
+    # التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
+    # التشخيص
     if eff < 45: 
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج."
         acts = ["خصص ساعة عمل مركزة.", "قلل التصفح."]
@@ -169,6 +175,7 @@ if calc_btn:
     }
     st.session_state['res'] = calculate_sunan_scores(vals)
 
+# عرض النتائج
 if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
     
@@ -181,7 +188,32 @@ if st.session_state['res']:
     with col_info:
         st.subheader(f"نتيجة: {user_name}")
         st.info(diag)
+        # --- ✅ هنا كان الخطأ وتم إصلاحه ---
         if acts:
-            # 👇 هنا كان الخطأ، تأكد أن السطر مكتوب هكذا
             for a in acts: st.warning(f"💡 {a}")
+            
+    if st.button("💾 تدوين النتيجة"):
+        if user_name and user_name != "مبادر":
+            if save_to_google_sheet(user_name, eff, def_s, coh, diag):
+                st.balloons(); st.success(f"تم التسجيل لـ {user_name}")
+        else:
+            st.error("يرجى كتابة الاسم.")
 
+st.markdown("---")
+
+# --- 6. لوحة المتصدرين ---
+st.header("🏆 لوحة الشرف")
+if st.button("🔄 تحديث القائمة"):
+    df = load_history_data()
+    if not df.empty:
+        try:
+            st.dataframe(df.tail(5), use_container_width=True)
+            if 'Name' in df.columns and 'Score_Eff' in df.columns:
+                leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
+                c1, c2, c3 = st.columns(3)
+                if len(leaderboard) > 0: c1.metric("الأول", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
+                if len(leaderboard) > 1: c2.metric("الثاني", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
+                if len(leaderboard) > 2: c3.metric("الثالث", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
+        except:
+            st.warning("تأكد من وجود الأعمدة (Name, Score_Eff) في ملف البيانات.")
+            st.dataframe(df)
