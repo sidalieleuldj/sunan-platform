@@ -14,30 +14,42 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. التصميم (CSS) - الحل النهائي الشامل ---
+# --- 2. CSS (إصلاح السلايدر واتجاه اللوحة) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
+    /* الخط العام */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
-    
-    .stMarkdown, .stTextInput > label, .stNumberInput > label, .stSelectbox > label, p, h1, h2, h3, h4, h5 {
+
+    /* النصوص والعناوين: اتجاه يمين */
+    .stMarkdown, p, h1, h2, h3, h4, h5, .stTextInput > label, .stNumberInput > label, .stSelectbox > label {
         text-align: right !important;
         direction: rtl !important;
     }
 
+    /* === إصلاح السلايدر (الحل الجذري) === */
+    /* 1. نجعل الحاوية يسارية لكي لا تتطاير الأرقام */
     div[data-testid="stSlider"] {
         direction: ltr !important;
     }
+    /* 2. نجعل النصوص فوق السلايدر يمنية */
     div[data-testid="stSlider"] > label {
         text-align: right !important;
         direction: rtl !important;
-        width: 100%;
-        display: block;
+        width: 100%; 
+        display: flex;
+        justify-content: flex-end;
     }
-    
+    /* 3. إصلاح مكان الأرقام (التي تحت السلايدر) */
+    div[data-testid="stSlider"] [data-testid="stTickBarMin"],
+    div[data-testid="stSlider"] [data-testid="stTickBarMax"] {
+        font-family: 'Cairo', sans-serif;
+    }
+
+    /* القائمة الجانبية: مكانها يسار، محتواها يمين */
     section[data-testid="stSidebar"] {
         left: 0 !important;
         right: auto !important;
@@ -46,22 +58,19 @@ st.markdown("""
         text-align: right !important;
     }
 
+    /* الحقول والأزرار */
+    input {
+        text-align: right !important;
+        direction: rtl !important;
+    }
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
         color: white;
         border-radius: 8px;
     }
-    input {
-        text-align: right !important;
-        direction: rtl !important;
-    }
     
-    .stAlert {
-        direction: rtl !important;
-        text-align: right !important;
-    }
-    
+    /* الجداول */
     [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
@@ -93,11 +102,19 @@ def load_history_data():
     if sheet:
         try:
             data = sheet.get_all_records()
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+            # --- إصلاح البيانات (تحويل النصوص لأرقام) ---
+            # هذا الجزء سيحل مشكلة الترتيب 862 vs 98
+            cols_to_fix = ['Score_Eff', 'Score_Def', 'Score_Coh']
+            for col in cols_to_fix:
+                if col in df.columns:
+                    # تحويل القيم إلى أرقام، وأي خطأ يتحول لصفر
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            return df
         except: pass
     return pd.DataFrame()
 
-# --- 4. محرك السنن (مع التحديث الجديد للحالة 4) ---
+# --- 4. محرك السنن ---
 def calculate_sunan_scores(data):
     # معادلة الفعالية
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
@@ -117,17 +134,16 @@ def calculate_sunan_scores(data):
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج."
         acts = ["خصص ساعة عمل مركزة.", "قلل التصفح."]
     elif def_s < 45: 
-        diag = "⚠️ جهد مكشوف: مستنزف في ردود الأفعال."
+        diag = "⚠️ جهد مكشوف: إنتاجك عالٍ لكنك مستنزف."
         acts = ["توقف عن الجدال.", "ابنِ محتواك الخاص."]
     elif coh < 45: 
-        diag = "🧩 تشتت الجهد: ذرة قوية لكن منعزلة."
+        diag = "🧩 تشتت الجهد: ذرة قوية لكن تعمل وحيداً."
         acts = ["ابحث عن شريك.", "اربط عملك بهدف."]
     else: 
-        # --- التحديث الجديد (الحالة المتوازنة) ---
-        diag = "🌟 حالة متوازنة (الاستواء الحضاري): أنت الآن في مرحلة العطاء."
+        diag = "🌟 حالة متوازنة (الاستواء الحضاري): استمر على هذا المنوال."
         acts = [
-            "زكاة العلم تعليمه: تبنَّ شخصاً مبتدئاً ووجهه.",
-            "وثّق تجربتك: اكتب كيف تغلبت على المشتتات لتلهم غيرك."
+            "زكاة العلم تعليمه: وجه شخصاً مبتدئاً.",
+            "وثّق تجربتك لتلهم غيرك."
         ]
         
     return eff, def_s, coh, diag, acts
@@ -170,7 +186,6 @@ if calc_btn:
     }
     st.session_state['res'] = calculate_sunan_scores(vals)
 
-# عرض النتائج
 if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
     
@@ -186,7 +201,7 @@ if st.session_state['res']:
         if acts:
             for a in acts: st.warning(f"💡 {a}")
             
-    if st.button("💾 تدوين النتيجة"):
+    if st.button("💾 تدوين النتيجة في السجل"):
         if user_name and user_name != "مبادر":
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
                 st.balloons(); st.success(f"تم التسجيل لـ {user_name}")
@@ -195,19 +210,31 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين ---
+# --- 6. لوحة المتصدرين (المصححة) ---
 st.header("🏆 لوحة الشرف")
+
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
+            # عرض الجدول
             st.dataframe(df.tail(5), use_container_width=True)
+            
+            # حساب المتصدرين (بعد التأكد من أن القيم أرقام)
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
+                # نستخدم max لجلب أفضل نتيجة لكل شخص
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
+                
+                st.subheader("🥇 أعلى 3 رواد في الفعالية")
                 c1, c2, c3 = st.columns(3)
-                if len(leaderboard) > 0: c1.metric("الأول", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
-                if len(leaderboard) > 1: c2.metric("الثاني", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
-                if len(leaderboard) > 2: c3.metric("الثالث", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
-        except:
-            st.warning("تأكد من وجود الأعمدة (Name, Score_Eff) في ملف البيانات.")
-            st.dataframe(df)
+                
+                if len(leaderboard) > 0: 
+                    c1.metric("المركز الأول", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
+                if len(leaderboard) > 1: 
+                    c2.metric("المركز الثاني", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
+                if len(leaderboard) > 2: 
+                    c3.metric("المركز الثالث", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
+        except Exception as e:
+            st.warning("حدث خطأ في عرض الترتيب، تأكد من صحة البيانات.")
+    else:
+        st.info("لا توجد بيانات للعرض.")
