@@ -18,49 +18,35 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* الخط العام */
-    html, body, [class*="css"] {
-        font-family: 'Cairo', sans-serif;
-    }
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; }
+    
+    /* الحفاظ على الهيكل LTR */
+    .stApp { direction: ltr; }
 
-    /* 🛑 هام: إبقاء هيكل التطبيق LTR لمنع انهيار السلايدر */
-    .stApp {
-        direction: ltr;
-    }
-
-    /* تحويل النصوص والعناصر الداخلية فقط إلى RTL */
+    /* تعريب النصوص والعناوين */
     .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert, .stDataFrame {
-        text-align: right !important;
-        direction: rtl !important;
+        text-align: right !important; direction: rtl !important;
     }
     
-    /* إصلاح خاص لعناوين السلايدر */
-    .stSlider > label {
-        width: 100%;
+    /* ضبط محاذاة "Label" في المتركس لتكون يمين */
+    div[data-testid="stMetricLabel"] {
         text-align: right !important;
-        direction: rtl !important;
-        display: block;
+        width: 100%;
+        direction: rtl;
+    }
+
+    /* ضبط السلايدر */
+    .stSlider > label {
+        width: 100%; text-align: right !important; direction: rtl !important; display: block;
     }
     
     /* القائمة الجانبية */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
-        text-align: right !important;
-        direction: rtl !important;
+        text-align: right !important; direction: rtl !important;
     }
     
-    /* حقول الإدخال */
-    input {
-        text-align: right !important;
-        direction: rtl !important;
-    }
-
-    /* الأزرار */
-    .stButton>button {
-        width: 100%;
-        background-color: #1F618D;
-        color: white;
-        border-radius: 8px;
-    }
+    input { text-align: right !important; direction: rtl !important; }
+    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -73,40 +59,28 @@ def get_google_sheet():
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
-    except:
-        return None
+    except: return None
 
 def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            # 🛑 التغيير الأول: نحفظ الرقم كـ STRING بنقطة (.) عادية جداً
-            # هذا يمنع جوجل شيت من التذاكي وتحويله إلى صيغ غريبة
-            row = [
-                name, 
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                str(eff),      # حفظنا الرقم كما هو (مثلاً "86.2")
-                str(def_score), 
-                str(coh), 
-                diagnosis
-            ]
+            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
             sheet.append_row(row)
             return True
         except: return False
     return False
 
-# --- دالة التنظيف الصارمة ---
-def force_float_conversion(val):
-    """دالة تجبر أي قيمة على أن تصبح رقماً عشرياً وتصحح الفواصل"""
+# --- 🧹 الفلتر الذكي لإصلاح الأرقام ---
+def smart_fix_score(val):
     try:
-        # 1. تحويل القيمة لنص أولاً
-        s_val = str(val)
-        
-        # 2. استبدال الفاصلة بالنقطة (لحل مشكلة التنسيق الأوروبي)
-        s_val = s_val.replace(',', '.')
-        
-        # 3. التحويل لرقم عشري
-        return float(s_val)
+        s_val = str(val).replace(',', '.')
+        score = float(s_val)
+        if score > 100: # إصلاح مشكلة اختفاء الفاصلة
+            score = score / 10
+        if score > 100: # حد أقصى
+            score = 100.0
+        return score
     except:
         return 0.0
 
@@ -116,18 +90,14 @@ def load_history_data():
         try:
             data = sheet.get_all_records()
             df = pd.DataFrame(data)
-            
             if not df.empty:
-                # 🛑 التغيير الثاني: تنظيف الأعمدة بالقوة الجبرية
-                target_cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
-                
-                for col in target_cols:
-                    if col in df.columns:
-                        # نطبق دالة التنظيف على كل خلية في العمود
-                        df[col] = df[col].apply(force_float_conversion)
+                cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
+                for c in cols:
+                    if c in df.columns:
+                        df[c] = df[c].apply(smart_fix_score)
             return df
         except Exception as e:
-            st.error(f"حدث خطأ أثناء جلب البيانات: {e}")
+            st.error(f"خطأ: {e}")
     return pd.DataFrame()
 
 # --- 4. محرك السنن ---
@@ -219,30 +189,28 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين ---
+# --- 6. لوحة المتصدرين (التعديل المطلوب) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            # عرض الجدول الخام (للتأكد فقط)
-            with st.expander("عرض السجل الكامل"):
-                st.dataframe(df, use_container_width=True)
+            st.dataframe(df.tail(5), use_container_width=True)
             
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
-                # الترتيب الآن سيكون دقيقاً 100% لأن البيانات كلها أرقام
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
                 c1, c2, c3 = st.columns(3)
-                # نستخدم التنسيق .2f لإظهار منزلتين عشريتين
+                
+                # ✅ هنا التغيير: الاسم في الأعلى (label)، والنتيجة في الأسفل (value)
                 if len(leaderboard) > 0: 
-                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.2f}%")
+                    c1.metric(label=f"🥇 {leaderboard.index[0]}", value=f"{leaderboard.iloc[0]:.1f}%")
                 if len(leaderboard) > 1: 
-                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.2f}%")
+                    c2.metric(label=f"🥈 {leaderboard.index[1]}", value=f"{leaderboard.iloc[1]:.1f}%")
                 if len(leaderboard) > 2: 
-                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.2f}%")
+                    c3.metric(label=f"🥉 {leaderboard.index[2]}", value=f"{leaderboard.iloc[2]:.1f}%")
         except Exception as e:
-            st.error(f"خطأ في العرض: {e}")
+            st.error(f"خطأ: {e}")
     else:
-        st.info("السجل فارغ. قم بتسجيل أول نتيجة!")
+        st.info("السجل فارغ.")
