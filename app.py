@@ -14,37 +14,51 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. التصميم (CSS) - النسخة التي تضمن بقاء اللوحة يساراً ---
+# --- 2. التصميم (CSS) - الحل النهائي لمشكلة اللوحة ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    body, .main, .stMarkdown, p, h1, h2, h3, h4, h5, span, div {
+    /* 1. إبقاء هيكل الصفحة LTR (لتثبيت اللوحة يساراً) */
+    body {
+        direction: ltr;
+    }
+
+    /* 2. تحويل النصوص والعناصر الداخلية فقط إلى RTL (للعربية) */
+    .stMarkdown, .stTextInput, .stNumberInput, .stSelectbox, .stSlider, p, h1, h2, h3, h4, h5, .stAlert {
         font-family: 'Cairo', sans-serif !important;
-        text-align: right !important;
         direction: rtl !important;
+        text-align: right !important;
     }
+
+    /* 3. تنسيق خاص للقائمة الجانبية (محتواها عربي لكن مكانها يسار) */
     section[data-testid="stSidebar"] {
-        left: 0 !important;
-        right: auto !important;
         text-align: right !important;
     }
-    .stSlider, .stCheckbox, .stNumberInput, .stTextInput {
+    
+    /* ضبط محاذاة العناوين داخل اللوحة */
+    section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {
         direction: rtl !important;
         text-align: right !important;
     }
+
+    /* 4. تنسيق مربعات الإدخال لتكتب من اليمين */
+    input {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* 5. تنسيق الأزرار */
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
         color: white;
         border-radius: 8px;
-        border: none;
+        font-family: 'Cairo', sans-serif;
     }
-    /* تنسيق خاص للوحة المتصدرين */
-    div[data-testid="stMetricValue"] {
-        font-size: 20px;
-        color: #1F618D;
-    }
+    
+    /* تنسيق جدول البيانات */
+    [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -55,23 +69,25 @@ def get_google_sheet():
         creds_dict = st.secrets["service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        # 🚨 تأكد أن الـ ID هنا هو الصحيح لملفك
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except:
         return None
 
-# تحديث دالة الحفظ لتشمل الاسم
+# دالة الحفظ (مع الاسم)
 def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            # الترتيب الجديد: الاسم، التاريخ، الفعالية، المناعة، التماسك، التشخيص
+            # الترتيب: الاسم، التاريخ، الفعالية، المناعة، التماسك، التشخيص
             row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), eff, def_score, coh, diagnosis]
             sheet.append_row(row)
             return True
         except: return False
     return False
 
+# دالة جلب البيانات
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
@@ -81,21 +97,25 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-# --- 4. محرك السنن (المحدث) ---
+# --- 4. محرك السنن (المعادلة الموزونة) ---
 def calculate_sunan_scores(data):
     # معادلة الفعالية (نظام الخصم)
+    # النقاط = (الإنتاج * 80 + المشاريع * 20) * (الجودة / 5) - (ساعات التصفح * 3)
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
     eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
     eff = max(min(round(eff, 2), 100), 5)
     
     # المناعة
-    total = data['original_posts'] + data['replies'] + 0.1
-    def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
+    total_actions = data['original_posts'] + data['replies'] + 0.1
+    indep_ratio = data['original_posts'] / total_actions
+    stability = data['emotional_stability'] / 10.0
+    def_s = round(((data['original_posts'] / total_actions) * 60) + (stability * 40), 2)
     
     # التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
+    # التشخيص
     if eff < 45: 
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج."
         acts = ["خصص ساعة عمل مركزة.", "قلل التصفح."]
@@ -106,7 +126,7 @@ def calculate_sunan_scores(data):
         diag = "🧩 تشتت الجهد: ذرة قوية لكن منعزلة."
         acts = ["ابحث عن شريك.", "اربط عملك بهدف."]
     else: 
-        diag = "🌟 حالة متوازنة: استمر على هذا المنوال."
+        diag = "🌟 حالة متوازنة (الاستواء الحضاري): استمر على هذا المنوال."
         acts = []
         
     return eff, def_s, coh, diag, acts
@@ -118,7 +138,7 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
     st.header("🎛️ لوحة التحكم")
     
-    # --- إضافة خانة الاسم ---
+    # خانة الاسم
     st.markdown("### 👤 بيانات المستخدم")
     user_name = st.text_input("سجل اسمك هنا", "مبادر")
     st.markdown("---")
@@ -143,7 +163,6 @@ with st.sidebar:
 st.title("🕌 منصة السُّنَن الرقمية")
 
 if calc_btn:
-    # تمرير البيانات للحساب
     vals = {
         'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects,
         'quality_score': quality, 'original_posts': orig, 'replies': replies,
@@ -167,7 +186,7 @@ if st.session_state['res']:
         if acts:
             for a in acts: st.warning(f"💡 {a}")
             
-    # زر الحفظ مع الاسم
+    # زر الحفظ
     if st.button("💾 تدوين النتيجة في السجل العام"):
         if user_name and user_name != "مبادر":
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
@@ -177,37 +196,28 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (الجديد) ---
+# --- 6. لوحة المتصدرين ---
 st.header("🏆 لوحة الشرف (فرسان الحضارة)")
-
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
-        # نفترض أن العمود الأول هو الاسم، والثالث هو الفعالية
-        # ملاحظة: يعتمد هذا على أسماء الأعمدة في Google Sheet
-        # يفضل أن تكون الأعمدة في الشيت: Name, Date, Efficiency, Immunity, Cohesion, Diagnosis
         try:
-            # ترتيب حسب الفعالية (الأعلى فالأعلى)
-            # نستخدم أسماء الأعمدة المتوقعة، إذا لم تكن موجودة نستخدم المؤشرات
-            # هنا سنفترض أنك ستسمي الأعمدة في شيت جوجل كالتالي:
-            # Name, Date, Score_Eff, Score_Def, Score_Coh, Diagnosis
+            # نتوقع أسماء الأعمدة في جوجل شيت كالتالي: Name, Date, Score_Eff, Score_Def, Score_Coh, Diagnosis
+            # إذا كانت الأسماء مختلفة قد لا يظهر الترتيب بدقة، لذا نعرض الجدول الخام احتياطياً
             
-            # للعرض المبسط سنأخذ آخر 5 مساهمات
-            st.subheader("آخر المساهمات الموثقة")
-            st.dataframe(df.tail(5), use_container_width=True)
+            # محاولة عرض الجدول
+            st.dataframe(df.tail(10), use_container_width=True)
             
-            # محاولة صنع لوحة متصدرين
-            if 'Score_Eff' in df.columns and 'Name' in df.columns:
+            # محاولة استخراج المتصدرين (إذا كانت الأعمدة موجودة)
+            if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 st.subheader("🥇 أعلى 3 رواد في الفعالية")
-                
                 c1, c2, c3 = st.columns(3)
-                if len(leaderboard) >= 1: c1.metric("المركز الأول", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
-                if len(leaderboard) >= 2: c2.metric("المركز الثاني", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
-                if len(leaderboard) >= 3: c3.metric("المركز الثالث", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
-                
-        except Exception as e:
-            st.warning("يرجى ضبط عناوين الأعمدة في Google Sheet لتكون (Name, Date, Score_Eff, Score_Def, Score_Coh, Diagnosis) لظهور الترتيب بدقة.")
-            st.dataframe(df) # عرض الجدول كما هو احتياطياً
+                if len(leaderboard) > 0: c1.metric("المركز 1", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
+                if len(leaderboard) > 1: c2.metric("المركز 2", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
+                if len(leaderboard) > 2: c3.metric("المركز 3", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
+        except:
+            st.warning("تم جلب البيانات، لكن يرجى التأكد من أسماء الأعمدة لظهور لوحة المتصدرين.")
+            st.dataframe(df)
     else:
-        st.info("لا توجد سجلات بعد.")
+        st.info("السجل فارغ حالياً.")
