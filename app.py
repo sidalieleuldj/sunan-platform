@@ -28,21 +28,10 @@ st.markdown("""
         text-align: right !important; direction: rtl !important;
     }
     
-    /* جعل جداول المارك داون تأخذ اتجاه اليمين وتملأ العرض */
-    table {
-        width: 100% !important;
+    /* جعل الأعمدة (Columns) تدعم اليمين لليسار */
+    div[data-testid="column"] {
+        text-align: right !important;
         direction: rtl !important;
-        text-align: right !important;
-        border-collapse: collapse !important;
-    }
-    th, td {
-        text-align: right !important;
-        padding: 10px !important;
-        border-bottom: 1px solid #ddd !important;
-    }
-    th {
-        background-color: #f0f2f6 !important;
-        color: #1F618D !important;
     }
     
     /* السلايدر */
@@ -197,7 +186,7 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (النسخة المضمونة - Markdown Table) ---
+# --- 6. لوحة المتصدرين (تصميم الأعمدة الأصلي - لا يمكن أن ينكسر) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
@@ -210,20 +199,36 @@ if st.button("🔄 تحديث القائمة"):
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
-                # --- إنشاء جدول أنيق باستخدام Markdown الآمن ---
-                md_table = """
-                | المركز | الاسم | الفعالية |
-                | :--- | :--- | :--- |
-                """
+                # العنوان (الترويسة)
+                st.markdown("#### 🌟 أعلى النتائج")
+                
+                # --- بناء الجدول باستخدام الأعمدة (Columns) ---
+                # هذا الأسلوب لا يستخدم HTML وبالتالي لا يمكن أن يفشل
+                
+                # ترويسة الجدول
+                h1, h2, h3 = st.columns([1, 2, 1])
+                h1.markdown("**المركز**")
+                h2.markdown("**الاسم**")
+                h3.markdown("**الفعالية**")
+                st.markdown("---")
                 
                 medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
                 
                 for i, (name, score) in enumerate(leaderboard.items()):
-                    rank = medals[i] if i < 3 else f"{i+1}"
-                    # إضافة الصف للجدول
-                    md_table += f"| {rank} | {name} | **{score:.1f}%** |\n"
-                
-                st.markdown(md_table)
+                    # تجهيز البيانات
+                    rank_text = medals[i] if i < 3 else f"{i+1}"
+                    score_text = f"{score:.1f}%"
+                    
+                    # إنشاء صف جديد
+                    c1, c2, c3 = st.columns([1, 2, 1])
+                    
+                    # تعبئة البيانات في الأعمدة
+                    with c1: st.markdown(f"**{rank_text}**")
+                    with c2: st.markdown(f"{name}")
+                    with c3: st.markdown(f"**{score_text}**")
+                    
+                    # خط فاصل خفيف
+                    st.divider()
                 
         except Exception as e:
             st.error(f"حدث خطأ أثناء العرض: {e}")
