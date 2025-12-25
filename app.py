@@ -13,28 +13,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS "الوضع الآمن" (يحل مشكلة النقاط الحمراء) ---
+# --- 2. CSS (النسخة الآمنة للمظهر) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* تطبيق الخط العربي على كل شيء */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
 
-    /* هام جداً: إبقاء اتجاه الصفحة LTR لمنع تكسر السلايدر */
-    .stApp {
-        direction: ltr;
-    }
+    /* إبقاء اتجاه الصفحة LTR لمنع مشاكل العرض، مع تعريب النصوص */
+    .stApp { direction: ltr; }
 
-    /* تحويل النصوص والعناوين وحقول الإدخال فقط لليمين */
     .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
         text-align: right !important;
         direction: rtl !important;
     }
     
-    /* تنسيق خاص للسلايدر لضبط العنوان */
     .stSlider > label {
         width: 100%;
         text-align: right !important;
@@ -42,19 +37,16 @@ st.markdown("""
         display: block;
     }
     
-    /* تنسيق خاص للقائمة الجانبية ونصوصها */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
         text-align: right !important;
         direction: rtl !important;
     }
     
-    /* جعل حقول الإدخال تكتب من اليمين */
     input {
         text-align: right !important;
         direction: rtl !important;
     }
 
-    /* تنسيق الأزرار */
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
@@ -62,7 +54,6 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    /* تنسيق الجدول */
     [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
@@ -83,12 +74,18 @@ def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), eff, def_score, coh, diagnosis]
+            # نقوم بتخزين الأرقام كنصوص مع نقطة لضمان الدقة مستقبلاً
+            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                   str(eff).replace('.', ','), # تخزينها بفاصلة في جوجل شيت إذا كنت تفضل ذلك للعرض
+                   str(def_score).replace('.', ','), 
+                   str(coh).replace('.', ','), 
+                   diagnosis]
             sheet.append_row(row)
             return True
         except: return False
     return False
 
+# --- دالة جلب البيانات (تم التعديل هنا لحل المشكلة) ---
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
@@ -96,32 +93,33 @@ def load_history_data():
             data = sheet.get_all_records()
             df = pd.DataFrame(data)
             
-            # --- تنظيف البيانات القوي ---
             if not df.empty:
-                # التأكد من أن الأعمدة المطلوبة موجودة كأرقام
-                # هذا يحل مشكلة الترتيب الخاطئ (862 بدل 86.2)
+                # الأعمدة التي تحتوي على أرقام
                 cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
+                
                 for c in cols:
                     if c in df.columns:
-                        # تحويل النص إلى رقم، وإجبار الأخطاء لتصبح NaN ثم 0
+                        # 1. نحول العمود كله لنص (String)
+                        # 2. نستبدل الفاصلة (,) بالنقطة (.)
+                        # 3. نحوله لرقم (Numeric)
+                        df[c] = df[c].astype(str).str.replace(',', '.', regex=False)
                         df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
+                        
             return df
-        except: pass
+        except Exception as e:
+            st.error(f"خطأ في معالجة البيانات: {e}")
     return pd.DataFrame()
 
 # --- 4. محرك السنن ---
 def calculate_sunan_scores(data):
-    # معادلة الفعالية
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
     eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
     eff = max(min(round(eff, 2), 100), 5)
     
-    # المناعة
     total = data['original_posts'] + data['replies'] + 0.1
     def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
     
-    # التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
     if eff < 45: 
@@ -194,6 +192,7 @@ if st.session_state['res']:
             
     if st.button("💾 تدوين النتيجة"):
         if user_name and user_name != "مبادر":
+            # نمرر القيم كما هي، ودالة الحفظ ستحولها لشكل مناسب
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
                 st.balloons(); st.success(f"تم التسجيل لـ {user_name}")
         else:
@@ -203,22 +202,27 @@ st.markdown("---")
 
 # --- 6. لوحة المتصدرين ---
 st.header("🏆 لوحة الشرف")
+
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            # عرض آخر 5 نتائج
+            # عرض البيانات (للتأكد أن الفاصلة اختفت)
             st.dataframe(df.tail(5), use_container_width=True)
             
-            # لوحة الأوائل
+            # حساب المتصدرين
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
-                c1, c2, c3 = st.columns(3)
                 
-                if len(leaderboard) > 0: c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
-                if len(leaderboard) > 1: c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
-                if len(leaderboard) > 2: c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
+                c1, c2, c3 = st.columns(3)
+                if len(leaderboard) > 0: 
+                    # عرض الرقم بفاصلة عشرية واحدة للتجميل
+                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.1f}%")
+                if len(leaderboard) > 1: 
+                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.1f}%")
+                if len(leaderboard) > 2: 
+                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.1f}%")
         except Exception as e:
-            st.error("تأكد من نظافة البيانات في ملف Google Sheet")
+            st.error(f"خطأ: {e}")
     else:
         st.info("السجل فارغ.")
