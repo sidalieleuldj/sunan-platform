@@ -13,27 +13,45 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS (التصميم) ---
+# --- 2. CSS (التصميم والتعريب الشامل) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
     html, body, [class*="css"] { font-family: 'Cairo', sans-serif; }
     
+    /* اتجاه التطبيق LTR لمنع المشاكل التقنية في التخطيط */
     .stApp { direction: ltr; }
 
+    /* تعريب النصوص والعناوين */
     .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert, .stDataFrame {
         text-align: right !important; direction: rtl !important;
     }
     
-    div[data-testid="stTable"] { direction: rtl; text-align: right; }
-    table { width: 100%; text-align: right !important; }
-    th, td { text-align: right !important; }
+    /* جعل الجداول الأصلية يمين */
+    div[data-testid="stTable"] {
+        direction: rtl;
+        text-align: right;
+    }
+    table {
+        width: 100%;
+        text-align: right !important;
+    }
+    th, td {
+        text-align: right !important;
+    }
     
-    .stSlider > label { width: 100%; text-align: right !important; direction: rtl !important; display: block; }
+    /* السلايدر */
+    .stSlider > label {
+        width: 100%; text-align: right !important; direction: rtl !important; display: block;
+    }
+    
+    /* القائمة الجانبية */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
         text-align: right !important; direction: rtl !important;
     }
+    
+    /* حقول الإدخال والأزرار */
     input { text-align: right !important; direction: rtl !important; }
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
 </style>
@@ -54,20 +72,23 @@ def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
+            # نحفظ القيم كنصوص لضمان عدم تلاعب جوجل شيت بالتنسيق
             row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
             sheet.append_row(row)
             return True
         except: return False
     return False
 
+# --- 🧹 الفلتر الذكي لإصلاح الأرقام ---
 def smart_fix_score(val):
     try:
-        s_val = str(val).replace(',', '.')
+        s_val = str(val).replace(',', '.') # تحويل الفاصلة لنقطة
         score = float(s_val)
-        if score > 100: score = score / 10
-        if score > 100: score = 100.0
+        if score > 100: score = score / 10 # إصلاح مشكلة الرقم 862 ليصبح 86.2
+        if score > 100: score = 100.0 # سقف النتيجة
         return score
-    except: return 0.0
+    except:
+        return 0.0
 
 def load_history_data():
     sheet = get_google_sheet()
@@ -81,21 +102,26 @@ def load_history_data():
                     if c in df.columns:
                         df[c] = df[c].apply(smart_fix_score)
             return df
-        except: pass
+        except Exception as e:
+            st.error(f"خطأ: {e}")
     return pd.DataFrame()
 
 # --- 4. محرك السنن ---
 def calculate_sunan_scores(data):
+    # معادلات الفعالية
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
     eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
     eff = max(min(round(eff, 2), 100), 5)
     
+    # معادلات المناعة
     total = data['original_posts'] + data['replies'] + 0.1
     def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
     
+    # معادلات التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
+    # التشخيص
     if eff < 45: 
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج."
         acts = ["خصص ساعة عمل مركزة.", "قلل التصفح."]
@@ -118,6 +144,7 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
     st.header("🎛️ لوحة التحكم")
     
+    st.markdown("### 👤 بيانات المستخدم")
     user_name = st.text_input("سجل اسمك هنا", "مبادر")
     st.markdown("---")
     
@@ -163,6 +190,7 @@ if st.session_state['res']:
         if acts:
             for a in acts: st.warning(f"💡 {a}")
             
+    # زر الحفظ
     col_save, col_empty = st.columns([1, 2])
     with col_save:
         if st.button("💾 تدوين النتيجة"):
@@ -172,53 +200,54 @@ if st.session_state['res']:
             else:
                 st.error("يرجى كتابة الاسم.")
 
-st.markdown("---")
-
-# --- 🔄 [جديد] قسم سجل النمو التاريخي ---
+# --- 6. قسم سجل النمو التاريخي (الجديد والمطور) ---
 if user_name and user_name != "مبادر":
+    st.markdown("---")
     st.header(f"📈 سجل النمو التاريخي: {user_name}")
     
-    # تحميل البيانات وتحضيرها
+    # تحميل البيانات
     df_history = load_history_data()
     
+    # التحقق من وجود بيانات
     if not df_history.empty and 'Name' in df_history.columns:
-        # 1. تصفية البيانات للمستخدم الحالي فقط
-        user_history = df_history[df_history['Name'] == user_name].copy()
+        # تنظيف الأسماء للمقارنة (حذف المسافات الزائدة لضمان تطابق الاسم)
+        df_history['Name_Clean'] = df_history['Name'].astype(str).str.strip()
+        current_user_clean = user_name.strip()
+        
+        # تصفية البيانات الخاصة بالمستخدم الحالي
+        user_history = df_history[df_history['Name_Clean'] == current_user_clean].copy()
         
         if not user_history.empty:
-            # 2. تحضير التواريخ
+            # معالجة التواريخ
             if 'Date' in user_history.columns:
                 user_history['Date'] = pd.to_datetime(user_history['Date'], errors='coerce')
                 user_history = user_history.sort_values('Date')
                 
-                # 3. رسم المخطط البياني
+                # إنشاء الرسم البياني
                 fig_hist = go.Figure()
                 
-                # خط الفعالية
+                # إضافة الخطوط الثلاثة
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Eff'],
                     mode='lines+markers', name='الفعالية',
                     line=dict(color='#1F618D', width=3)
                 ))
-                
-                # خط المناعة
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Def'],
                     mode='lines+markers', name='المناعة',
                     line=dict(color='#E74C3C', width=2, dash='dot')
                 ))
-                
-                # خط التماسك
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Coh'],
                     mode='lines+markers', name='التماسك',
                     line=dict(color='#27AE60', width=2, dash='dot')
                 ))
                 
+                # تنسيق الرسم
                 fig_hist.update_layout(
                     title="تطور المؤشرات عبر الزمن",
                     xaxis_title="التاريخ",
-                    yaxis_title="الدرجة (من 100)",
+                    yaxis_title="الدرجة",
                     yaxis=dict(range=[0, 105]),
                     hovermode="x unified",
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -226,32 +255,34 @@ if user_name and user_name != "مبادر":
                 
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
-                # تحليل سريع للاتجاه (Trend)
+                # رسالة التشجيع الذكية
                 if len(user_history) > 1:
-                    last_eff = user_history['Score_Eff'].iloc[-1]
-                    prev_eff = user_history['Score_Eff'].iloc[-2]
-                    diff = last_eff - prev_eff
-                    
-                    if diff > 0:
-                        st.success(f"👏 أحسنت! فعاليته زادت بمقدار {diff:.1f} نقطة عن آخر مرة.")
-                    elif diff < 0:
-                        st.warning(f"⚠️ انتبه! الفعالية تراجعت بمقدار {abs(diff):.1f} نقطة.")
-                    else:
-                        st.info("↔️ أداؤك ثابت.")
+                    last = user_history['Score_Eff'].iloc[-1]
+                    prev = user_history['Score_Eff'].iloc[-2]
+                    diff = last - prev
+                    if diff > 0: st.success(f"👏 تطور ممتاز! الفعالية زادت بـ +{diff:.1f} نقطة.")
+                    elif diff < 0: st.warning(f"⚠️ تراجع طفيف في الفعالية: {diff:.1f} نقطة.")
         else:
-            st.info("لا توجد بيانات تاريخية مسجلة لهذا الاسم بعد. ابدأ بتسجيل نتائجك!")
+            st.info(f"لم يتم العثور على سجلات سابقة للاسم: '{user_name}'. تأكد من كتابة الاسم تماماً كما سجلته سابقاً.")
+    else:
+        st.info("جاري تحميل البيانات... أو السجل فارغ.")
 
 st.markdown("---")
 
-# --- لوحة المتصدرين ---
+# --- 7. لوحة المتصدرين (النسخة المستقرة) ---
 st.header("🏆 لوحة الشرف")
 
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
+            with st.expander("📂 عرض سجل البيانات التفصيلي"):
+                st.dataframe(df, use_container_width=True)
+            
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
+                
+                # بناء قائمة للعرض كجدول
                 display_data = []
                 medals = ["🥇 الأول", "🥈 الثاني", "🥉 الثالث"]
                 
@@ -263,6 +294,7 @@ if st.button("🔄 تحديث القائمة"):
                         "النتيجة (الفعالية)": f"{score:.1f}%"
                     })
                 
+                # استخدام st.table لأنه الأفضل في دعم العربية والاتجاه
                 view_df = pd.DataFrame(display_data)
                 st.table(view_df)
                 
