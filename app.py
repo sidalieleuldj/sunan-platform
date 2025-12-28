@@ -174,51 +174,54 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 🔄 [جديد] قسم سجل النمو التاريخي ---
+# --- 🔄 قسم سجل النمو التاريخي (المصحح) ---
 if user_name and user_name != "مبادر":
+    st.markdown("---")
     st.header(f"📈 سجل النمو التاريخي: {user_name}")
     
-    # تحميل البيانات وتحضيرها
+    # تحميل البيانات
     df_history = load_history_data()
     
+    # التحقق من وجود بيانات
     if not df_history.empty and 'Name' in df_history.columns:
-        # 1. تصفية البيانات للمستخدم الحالي فقط
-        user_history = df_history[df_history['Name'] == user_name].copy()
+        # تنظيف الأسماء للمقارنة (حذف المسافات الزائدة)
+        df_history['Name_Clean'] = df_history['Name'].astype(str).str.strip()
+        current_user_clean = user_name.strip()
+        
+        # تصفية البيانات الخاصة بالمستخدم الحالي
+        user_history = df_history[df_history['Name_Clean'] == current_user_clean].copy()
         
         if not user_history.empty:
-            # 2. تحضير التواريخ
+            # معالجة التواريخ
             if 'Date' in user_history.columns:
                 user_history['Date'] = pd.to_datetime(user_history['Date'], errors='coerce')
                 user_history = user_history.sort_values('Date')
                 
-                # 3. رسم المخطط البياني
+                # إنشاء الرسم البياني
                 fig_hist = go.Figure()
                 
-                # خط الفعالية
+                # إضافة الخطوط الثلاثة
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Eff'],
                     mode='lines+markers', name='الفعالية',
                     line=dict(color='#1F618D', width=3)
                 ))
-                
-                # خط المناعة
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Def'],
                     mode='lines+markers', name='المناعة',
                     line=dict(color='#E74C3C', width=2, dash='dot')
                 ))
-                
-                # خط التماسك
                 fig_hist.add_trace(go.Scatter(
                     x=user_history['Date'], y=user_history['Score_Coh'],
                     mode='lines+markers', name='التماسك',
                     line=dict(color='#27AE60', width=2, dash='dot')
                 ))
                 
+                # تنسيق الرسم
                 fig_hist.update_layout(
                     title="تطور المؤشرات عبر الزمن",
                     xaxis_title="التاريخ",
-                    yaxis_title="الدرجة (من 100)",
+                    yaxis_title="الدرجة",
                     yaxis=dict(range=[0, 105]),
                     hovermode="x unified",
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -226,22 +229,17 @@ if user_name and user_name != "مبادر":
                 
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
-                # تحليل سريع للاتجاه (Trend)
+                # رسالة التشجيع
                 if len(user_history) > 1:
-                    last_eff = user_history['Score_Eff'].iloc[-1]
-                    prev_eff = user_history['Score_Eff'].iloc[-2]
-                    diff = last_eff - prev_eff
-                    
-                    if diff > 0:
-                        st.success(f"👏 أحسنت! فعاليته زادت بمقدار {diff:.1f} نقطة عن آخر مرة.")
-                    elif diff < 0:
-                        st.warning(f"⚠️ انتبه! الفعالية تراجعت بمقدار {abs(diff):.1f} نقطة.")
-                    else:
-                        st.info("↔️ أداؤك ثابت.")
+                    last = user_history['Score_Eff'].iloc[-1]
+                    prev = user_history['Score_Eff'].iloc[-2]
+                    diff = last - prev
+                    if diff > 0: st.success(f"👏 تطور ممتاز! +{diff:.1f}")
+                    elif diff < 0: st.warning(f"⚠️ تراجع طفيف: {diff:.1f}")
         else:
-            st.info("لا توجد بيانات تاريخية مسجلة لهذا الاسم بعد. ابدأ بتسجيل نتائجك!")
-
-st.markdown("---")
+            st.warning(f"لم يتم العثور على سجلات سابقة للاسم: '{user_name}'. تأكد من كتابة الاسم تماماً كما سجلته سابقاً.")
+    else:
+        st.info("جاري تحميل البيانات... أو السجل فارغ.")
 
 # --- لوحة المتصدرين ---
 st.header("🏆 لوحة الشرف")
@@ -270,3 +268,4 @@ if st.button("🔄 تحديث القائمة"):
             st.error(f"حدث خطأ أثناء العرض: {e}")
     else:
         st.info("السجل فارغ.")
+
