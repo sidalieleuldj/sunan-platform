@@ -190,8 +190,9 @@ if st.session_state['res']:
     with c2:
         st.info(f"النتيجة: {user_name}\n\n{diag}")
         
-        # --- 🤖 زر استدعاء Gemini ---
-        if st.button("✨ استشارة المرشد السنني (AI)"):
+        # --- زر المستشار الذكي ---
+        # أضفت مفتاحاً فريداً (key) للزر لضمان عدم اختفائه
+        if st.button("✨ استشارة المرشد السنني (AI)", key="ai_btn"):
             with st.spinner('جاري الاتصال بـ Gemini للتحليل...'):
                 advice = get_ai_consultation(user_name, eff, def_s, coh, diag)
                 st.markdown(f"""
@@ -200,8 +201,10 @@ if st.session_state['res']:
                     <p>{advice}</p>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-             for a in acts: st.warning(f"💡 نصيحة سريعة: {a}")
+        
+        # النصائح السريعة تظهر دائماً تحت الزر
+        for a in acts: 
+            st.warning(f"💡 نصيحة سريعة: {a}")
     
     if st.button("💾 حفظ النتيجة"):
         if user_name != "مبادر":
@@ -238,3 +241,4 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
