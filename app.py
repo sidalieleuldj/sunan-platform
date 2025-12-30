@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import google.generativeai as genai  # 🧠 مكتبة جوجل Gemini
 
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(
@@ -26,20 +25,9 @@ st.markdown("""
     div[data-testid="stTable"] { direction: rtl; text-align: right; }
     table { width: 100%; text-align: right !important; }
     th, td { text-align: right !important; }
+    .stSlider > label { width: 100%; text-align: right !important; direction: rtl !important; display: block; }
     input { text-align: right !important; direction: rtl !important; }
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
-    
-    /* تنسيق خاص لرسالة المستشار الذكي */
-    .ai-box {
-        background-color: #e8f4f8;
-        border-right: 5px solid #1F618D;
-        padding: 20px;
-        border-radius: 8px;
-        margin-top: 20px;
-        color: #2c3e50;
-        font-size: 1.1em;
-        line-height: 1.6;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,6 +46,7 @@ def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
+            # الترتيب: الاسم، التاريخ، الفعالية، المناعة، التماسك، التشخيص
             row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
             sheet.append_row(row)
             return True
@@ -73,57 +62,44 @@ def smart_fix_score(val):
         return score
     except: return 0.0
 
+# --- 🛑 الدالة التي تم إصلاحها جذرياً ---
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
         try:
+            # نستخدم get_all_values بدلاً من records لنتجاهل العناوين الخاطئة
             data = sheet.get_all_values()
+            
+            # تحويل لقائمة باندا
             df = pd.DataFrame(data)
-            if df.empty or len(df.columns) < 6: return pd.DataFrame()
+            
+            # إذا كان الجدول فارغاً تماماً
+            if df.empty:
+                return pd.DataFrame()
+
+            # التأكد من أن لدينا 6 أعمدة على الأقل
+            if len(df.columns) < 6:
+                return pd.DataFrame()
+                
+            # نختار أول 6 أعمدة فقط ونجبر تسميتها (الحل السحري)
             df = df.iloc[:, :6]
             df.columns = ['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis']
+            
+            # تنظيف: حذف الصف الذي يحتوي على كلمة "Name" إذا كان موجوداً (صف العناوين)
             df = df[df['Name'] != 'Name']
-            for c in ['Score_Eff', 'Score_Def', 'Score_Coh']:
+            df = df[df['Name'] != ''] # حذف الصفوف الفارغة
+            
+            # تطبيق إصلاح الأرقام
+            cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
+            for c in cols:
                 df[c] = df[c].apply(smart_fix_score)
+                
             return df
-        except: pass
+        except Exception as e:
+            st.error(f"Error loading: {e}")
     return pd.DataFrame()
 
-# --- 🧠 4. المستشار السنني (نسخة Gemini) ---
-def get_ai_consultation(name, eff, def_s, coh, diag):
-    try:
-        api_key = st.secrets.get("gemini_key")
-        if not api_key:
-            return "⚠️ لم يتم العثور على المفتاح في الأسرار."
-        
-        # تهيئة المكتبة
-        genai.configure(api_key=api_key)
-        
-        # جلب قائمة الموديلات المتاحة لحسابك برمجياً لتجنب الخطأ 404
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        if not available_models:
-            return "❌ لا توجد موديلات متاحة لهذا المفتاح حالياً."
-        
-        # اختيار أول موديل متاح (غالباً سيكون gemini-pro أو gemini-1.5-flash المحدث)
-        model_name = available_models[0]
-        model = genai.GenerativeModel(model_name)
-        
-        prompt = f"""
-        أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
-        المستخدم: {name}
-        النتائج: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
-        التشخيص: {diag}.
-        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط.
-        """
-        
-        response = model.generate_content(prompt)
-        return response.text
-
-    except Exception as e:
-        return f"❌ فشل الاتصال النهائي: {str(e)}"
-        
-# --- 5. محرك السنن ---
+# --- 4. محرك السنن ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
@@ -141,7 +117,7 @@ def calculate_sunan_scores(data):
         
     return eff, def_s, coh, diag, acts
 
-# --- 6. واجهة المستخدم ---
+# --- 5. الواجهة ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
@@ -161,7 +137,7 @@ with st.sidebar:
     with st.expander("🤝 التماسك"):
         align = st.slider("وضوح الهدف", 0, 10, 5)
         team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🔍 تحليل الموقف")
+    calc_btn = st.button("🔍 تحليل")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
@@ -180,22 +156,7 @@ if st.session_state['res']:
         st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.info(f"النتيجة: {user_name}\n\n{diag}")
-        
-        # --- زر المستشار الذكي ---
-        # أضفت مفتاحاً فريداً (key) للزر لضمان عدم اختفائه
-        if st.button("✨ استشارة المرشد السنني (AI)", key="ai_btn"):
-            with st.spinner('جاري الاتصال بـ Gemini للتحليل...'):
-                advice = get_ai_consultation(user_name, eff, def_s, coh, diag)
-                st.markdown(f"""
-                <div class="ai-box">
-                    <h4>🤖 بصيرة سننية (عبر Gemini):</h4>
-                    <p>{advice}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # النصائح السريعة تظهر دائماً تحت الزر
-        for a in acts: 
-            st.warning(f"💡 نصيحة سريعة: {a}")
+        for a in acts: st.warning(f"💡 {a}")
     
     if st.button("💾 حفظ النتيجة"):
         if user_name != "مبادر":
@@ -203,26 +164,42 @@ if st.session_state['res']:
                 st.balloons(); st.success("تم الحفظ")
         else: st.error("اكتب الاسم")
 
-# --- 7. الرسم البياني ---
+# --- 6. الرسم البياني (معالجة الأخطاء) ---
 if user_name and user_name != "مبادر":
     st.markdown("---")
     st.header(f"📈 المسار التاريخي: {user_name}")
+    
     df_history = load_history_data()
+    
     if not df_history.empty:
+        # تنظيف الأسماء
         df_history['Name_Clean'] = df_history['Name'].astype(str).str.strip()
         target_name = user_name.strip()
+        
         user_hist = df_history[df_history['Name_Clean'] == target_name].copy()
+        
         if not user_hist.empty:
+            # تحويل التاريخ (مع التعامل مع الأخطاء)
             user_hist['Date'] = pd.to_datetime(user_hist['Date'], errors='coerce')
             user_hist = user_hist.dropna(subset=['Date']).sort_values('Date')
+            
             if not user_hist.empty:
                 fig_h = go.Figure()
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Eff'], name='الفعالية', line=dict(color='#1F618D', width=3)))
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Def'], name='المناعة', line=dict(color='#E74C3C', dash='dot')))
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Coh'], name='التماسك', line=dict(color='#27AE60', dash='dot')))
+                
                 fig_h.update_layout(title="تطور الأداء", hovermode="x unified", yaxis=dict(range=[0, 105]))
                 st.plotly_chart(fig_h, use_container_width=True)
-        else: st.warning(f"لا توجد بيانات سابقة لـ {user_name}")
+            else:
+                st.warning("البيانات موجودة لكن التواريخ غير صالحة.")
+        else:
+            st.warning(f"لا توجد بيانات سابقة للاسم: {user_name}")
+            
+            # --- 🛠️ أداة التصحيح (تظهر فقط عند الخطأ) ---
+            with st.expander("🔧 عرض البيانات الخام (للمبرمج)"):
+                st.write("الأسماء الموجودة في الملف:")
+                st.write(df_history['Name'].unique())
 
 st.markdown("---")
 st.header("🏆 المتصدرين")
