@@ -12,30 +12,32 @@ st.set_page_config(page_title="منصة السُّنَن الرقمية", page_i
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
-        # تحويل Secrets إلى قاموس عادي
-        creds_info = {
-            "type": st.secrets["service_account"]["type"],
-            "project_id": st.secrets["service_account"]["project_id"],
-            "private_key_id": st.secrets["service_account"]["private_key_id"],
-            "private_key": st.secrets["service_account"]["private_key"].replace("\\n", "\n"), # أهم سطر
-            "client_email": st.secrets["service_account"]["client_email"],
-            "client_id": st.secrets["service_account"]["client_id"],
-            "auth_uri": st.secrets["service_account"]["auth_uri"],
-            "token_uri": st.secrets["service_account"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["service_account"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["service_account"]["client_x509_cert_url"]
-        }
+        # On récupère les secrets en s'assurant que c'est un dictionnaire
+        creds_info = dict(st.secrets["service_account"])
+        # Nettoyage crucial de la clé privée
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
         
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except Exception as e:
-        # هذا سيطبع لك الخطأ بالتفصيل في الشريط الجانبي لتشخيص المشكلة
-        st.sidebar.error(f"تفاصيل الخطأ: {str(e)}")
+        # Affiche l'erreur réelle pour le débogage
+        st.error(f"Erreur de connexion : {e}")
         return None
-        
+
+def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
+    sheet = get_google_sheet()
+    if sheet:
+        try:
+            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
+            sheet.append_row(row)
+            return True
+        except Exception as e:
+            st.error(f"Erreur d'écriture : {e}")
+            return False
+    return False
+
 # --- 3. LOGIQUE DE CALCUL ---
 def calculate_sunan_scores(data):
     # (Votre logique de calcul reste la même)
@@ -80,20 +82,25 @@ st.title("🕌 منصة السُّنَن الرقمية")
 
 # AFFICHAGE DES RÉSULTATS
 if st.session_state['res']:
+    # ON EXTRAIT LES VALEURS DEPUIS LE SESSION STATE POUR ÉVITER LE NAMERROR
     eff, def_s, coh, diag, acts = st.session_state['res']
     
-    # ... عرض الرسوم البيانية هنا ...
-
-    if st.button("💾 حفظ النتيجة الآن"):
-        if user_name and user_name != "مبادر":
-            with st.spinner('جاري الحفظ...'):
-                success = save_to_google_sheet(user_name, eff, def_s, coh, diag)
-                if success:
-                    st.success("تم الحفظ في السجل!")
-                    st.balloons()
-                else:
-                    st.error("فشل الحفظ. تأكد من مشاركة الملف مع بريد البوت.")
+    c1, c2 = st.columns([1.5, 1])
+    with c1:
+        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself'))
+        st.plotly_chart(fig)
+    with c2:
+        st.info(f"النتيجة: {user_name}\n\n{diag}")
+        for a in acts: st.warning(f"💡 {a}")
+    
+    # LE BOUTON DE SAUVEGARDE EST ICI, À L'INTÉRIEUR DU IF
+    if st.button("💾 حفظ النتيجة"):
+        if user_name != "مبادر":
+            success = save_to_google_sheet(user_name, eff, def_s, coh, diag)
+            if success:
+                st.success("تم الحفظ!")
+                st.balloons()
+            else:
+                st.error("خطأ في الحفظ")
         else:
-            st.warning("يرجى كتابة الاسم أولاً.")
-
-
+            st.error("الرجاء إدخال الاسم")
