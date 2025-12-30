@@ -80,26 +80,20 @@ st.title("🕌 منصة السُّنَن الرقمية")
 
 # AFFICHAGE DES RÉSULTATS
 if st.session_state['res']:
-    # ON EXTRAIT LES VALEURS DEPUIS LE SESSION STATE POUR ÉVITER LE NAMERROR
     eff, def_s, coh, diag, acts = st.session_state['res']
     
-    c1, c2 = st.columns([1.5, 1])
-    with c1:
-        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself'))
-        st.plotly_chart(fig)
-    with c2:
-        st.info(f"النتيجة: {user_name}\n\n{diag}")
-        for a in acts: st.warning(f"💡 {a}")
-    
-    # LE BOUTON DE SAUVEGARDE EST ICI, À L'INTÉRIEUR DU IF
-    if st.button("💾 حفظ النتيجة"):
-        if user_name != "مبادر":
-            success = save_to_google_sheet(user_name, eff, def_s, coh, diag)
-            if success:
-                st.success("تم الحفظ!")
-                st.balloons()
-            else:
-                st.error("خطأ في الحفظ")
+    # ... عرض الرسوم البيانية هنا ...
+
+    if st.button("💾 حفظ النتيجة الآن"):
+        if user_name and user_name != "مبادر":
+            with st.spinner('جاري الحفظ...'):
+                success = save_to_google_sheet(user_name, eff, def_s, coh, diag)
+                if success:
+                    st.success("تم الحفظ في السجل!")
+                    st.balloons()
+                else:
+                    st.error("فشل الحفظ. تأكد من مشاركة الملف مع بريد البوت.")
         else:
-            st.error("الرجاء إدخال الاسم")
+            st.warning("يرجى كتابة الاسم أولاً.")
+
 
