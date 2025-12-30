@@ -101,7 +101,8 @@ def get_ai_consultation(name, eff, def_s, coh, diag):
         genai.configure(api_key=api_key)
         
         # استخدام الموديل المستقر (Gemini Pro)
-        model = genai.GenerativeModel('gemini-pro') 
+        # جرب هذا الاسم الذي يعتبر الأكثر شمولاً وتوافقاً حالياً
+        model = genai.GenerativeModel('gemini-1.5-flash-latest') 
         
         # صياغة الرسالة بناءً على فكر مالك بن نبي والسننية
         prompt = f"""
@@ -228,6 +229,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
