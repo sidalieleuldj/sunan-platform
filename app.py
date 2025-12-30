@@ -92,25 +92,31 @@ def load_history_data():
 # --- 🧠 4. المستشار السنني (نسخة Gemini) ---
 def get_ai_consultation(name, eff, def_s, coh, diag):
     try:
+        # جلب المفتاح من الأسرار
         api_key = st.secrets.get("gemini_key")
         if not api_key:
              return "⚠️ لم يتم العثور على المفتاح في الأسرار."
         
+        # إعداد المكتبة
         genai.configure(api_key=api_key)
         
-        # تغيير الموديل إلى النسخة المستقرة الأكثر توافقاً
+        # استخدام الموديل المستقر (Gemini Pro)
         model = genai.GenerativeModel('gemini-pro') 
         
+        # صياغة الرسالة بناءً على فكر مالك بن نبي والسننية
         prompt = f"""
         أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
         حلل نتائج {name}: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
-        التشخيص الحالي: {diag}.
-        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط تخاطبه فيها باسمه.
+        التشخيص الحالي للبرنامج: {diag}.
+        المطلوب: وجه له نصيحة سُننية عملية وعميقة في 3 أسطر فقط تخاطبه فيها باسمه.
+        استخدم لغة قوية تربط بين عالم الأفكار وعالم الأشياء.
         """
         
+        # توليد المحتوى
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
+        # إظهار الخطأ التقني إذا وجد
         return f"❌ خطأ تقني في الموديل: {str(e)}"
 
 # --- 5. محرك السنن ---
@@ -222,6 +228,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
