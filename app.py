@@ -12,32 +12,30 @@ st.set_page_config(page_title="منصة السُّنَن الرقمية", page_i
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # On récupère les secrets en s'assurant que c'est un dictionnaire
-        creds_info = dict(st.secrets["service_account"])
-        # Nettoyage crucial de la clé privée
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+        
+        # تحويل Secrets إلى قاموس عادي
+        creds_info = {
+            "type": st.secrets["service_account"]["type"],
+            "project_id": st.secrets["service_account"]["project_id"],
+            "private_key_id": st.secrets["service_account"]["private_key_id"],
+            "private_key": st.secrets["service_account"]["private_key"].replace("\\n", "\n"), # أهم سطر
+            "client_email": st.secrets["service_account"]["client_email"],
+            "client_id": st.secrets["service_account"]["client_id"],
+            "auth_uri": st.secrets["service_account"]["auth_uri"],
+            "token_uri": st.secrets["service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["service_account"]["client_x509_cert_url"]
+        }
         
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except Exception as e:
-        # Affiche l'erreur réelle pour le débogage
-        st.error(f"Erreur de connexion : {e}")
+        # هذا سيطبع لك الخطأ بالتفصيل في الشريط الجانبي لتشخيص المشكلة
+        st.sidebar.error(f"تفاصيل الخطأ: {str(e)}")
         return None
-
-def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
-    sheet = get_google_sheet()
-    if sheet:
-        try:
-            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
-            sheet.append_row(row)
-            return True
-        except Exception as e:
-            st.error(f"Erreur d'écriture : {e}")
-            return False
-    return False
-
+        
 # --- 3. LOGIQUE DE CALCUL ---
 def calculate_sunan_scores(data):
     # (Votre logique de calcul reste la même)
@@ -104,3 +102,4 @@ if st.session_state['res']:
                 st.error("خطأ في الحفظ")
         else:
             st.error("الرجاء إدخال الاسم")
+
