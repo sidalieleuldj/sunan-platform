@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS ---
+# --- 2. CSS لتحسين المظهر ودعم اللغة العربية ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
@@ -23,71 +23,68 @@ st.markdown("""
         text-align: right !important; direction: rtl !important;
     }
     div[data-testid="stTable"] { direction: rtl; text-align: right; }
-    table { width: 100%; text-align: right !important; }
-    th, td { text-align: right !important; }
-    .stSlider > label { width: 100%; text-align: right !important; direction: rtl !important; display: block; }
-    input { text-align: right !important; direction: rtl !important; }
-    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
+    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. الاتصال بقاعدة البيانات ---
+# --- 3. الاتصال بقاعدة البيانات (Google Sheets) ---
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # Récupération des secrets
-        creds_info = st.secrets["service_account"]
         
-        # Correction automatique si les sauts de ligne de la clé privée sont mal interprétés
-        if isinstance(creds_info, dict) and "private_key" in creds_info:
-            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-            
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        # جلب البيانات من Secrets
+        creds_dict = dict(st.secrets["service_account"])
+        # إصلاح مشكلة مفتاح التشفير في السيرفرات
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        
+        # معرف الجدول الخاص بك
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except Exception as e:
-        st.sidebar.error(f"Erreur de connexion : {e}")
+        st.error(f"خطأ في الاتصال بقاعدة البيانات: {e}")
         return None
 
-# --- 🛑 الدالة التي تم إصلاحها جذرياً ---
+def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
+    sheet = get_google_sheet()
+    if sheet:
+        try:
+            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
+            sheet.append_row(row)
+            return True
+        except: return False
+    return False
+
+def smart_fix_score(val):
+    try:
+        s_val = str(val).replace(',', '.')
+        score = float(s_val)
+        if score > 100: score = score / 10
+        return min(max(score, 0), 100)
+    except: return 0.0
+
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
         try:
-            # نستخدم get_all_values بدلاً من records لنتجاهل العناوين الخاطئة
             data = sheet.get_all_values()
+            if len(data) <= 1: return pd.DataFrame() # فارغ أو يحتوي عناوين فقط
             
-            # تحويل لقائمة باندا
-            df = pd.DataFrame(data)
+            df = pd.DataFrame(data[1:], columns=['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis'])
             
-            # إذا كان الجدول فارغاً تماماً
-            if df.empty:
-                return pd.DataFrame()
-
-            # التأكد من أن لدينا 6 أعمدة على الأقل
-            if len(df.columns) < 6:
-                return pd.DataFrame()
-                
-            # نختار أول 6 أعمدة فقط ونجبر تسميتها (الحل السحري)
-            df = df.iloc[:, :6]
-            df.columns = ['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis']
+            # تنظيف وتحويل البيانات
+            for col in ['Score_Eff', 'Score_Def', 'Score_Coh']:
+                df[col] = df[col].apply(smart_fix_score)
             
-            # تنظيف: حذف الصف الذي يحتوي على كلمة "Name" إذا كان موجوداً (صف العناوين)
-            df = df[df['Name'] != 'Name']
-            df = df[df['Name'] != ''] # حذف الصفوف الفارغة
-            
-            # تطبيق إصلاح الأرقام
-            cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
-            for c in cols:
-                df[c] = df[c].apply(smart_fix_score)
-                
-            return df
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            return df.dropna(subset=['Name'])
         except Exception as e:
-            st.error(f"Error loading: {e}")
+            st.error(f"خطأ أثناء تحميل البيانات: {e}")
     return pd.DataFrame()
 
-# --- 4. محرك السنن ---
+# --- 4. محرك السنن (المنطق الحسابي) ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
@@ -105,7 +102,7 @@ def calculate_sunan_scores(data):
         
     return eff, def_s, coh, diag, acts
 
-# --- 5. الواجهة ---
+# --- 5. واجهة المستخدم ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
@@ -125,7 +122,8 @@ with st.sidebar:
     with st.expander("🤝 التماسك"):
         align = st.slider("وضوح الهدف", 0, 10, 5)
         team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🔍 تحليل")
+    
+    calc_btn = st.button("🔍 تحليل النتائج")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
@@ -139,62 +137,40 @@ if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
     c1, c2 = st.columns([1.5, 1])
     with c1:
-        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh], theta=['الفعالية', 'المناعة', 'التماسك'], fill='toself', line_color='#1F618D'))
+        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', line_color='#1F618D'))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=40, b=40))
         st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.info(f"النتيجة: {user_name}\n\n{diag}")
         for a in acts: st.warning(f"💡 {a}")
     
-    if st.button("💾 حفظ النتيجة"):
+    if st.button("💾 حفظ النتيجة في السجل"):
         if user_name != "مبادر":
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
-                st.balloons(); st.success("تم الحفظ")
-        else: st.error("اكتب الاسم")
+                st.balloons()
+                st.success("تم الحفظ بنجاح!")
+            else: st.error("فشل الحفظ، تحقق من الاتصال.")
+        else: st.error("يرجى إدخال اسمك أولاً")
 
-# --- 6. الرسم البياني (معالجة الأخطاء) ---
-if user_name and user_name != "مبادر":
-    st.markdown("---")
-    st.header(f"📈 المسار التاريخي: {user_name}")
-    
-    df_history = load_history_data()
-    
-    if not df_history.empty:
-        # تنظيف الأسماء
-        df_history['Name_Clean'] = df_history['Name'].astype(str).str.strip()
-        target_name = user_name.strip()
-        
-        user_hist = df_history[df_history['Name_Clean'] == target_name].copy()
-        
-        if not user_hist.empty:
-            # تحويل التاريخ (مع التعامل مع الأخطاء)
-            user_hist['Date'] = pd.to_datetime(user_hist['Date'], errors='coerce')
-            user_hist = user_hist.dropna(subset=['Date']).sort_values('Date')
-            
-            if not user_hist.empty:
-                fig_h = go.Figure()
-                fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Eff'], name='الفعالية', line=dict(color='#1F618D', width=3)))
-                fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Def'], name='المناعة', line=dict(color='#E74C3C', dash='dot')))
-                fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Coh'], name='التماسك', line=dict(color='#27AE60', dash='dot')))
-                
-                fig_h.update_layout(title="تطور الأداء", hovermode="x unified", yaxis=dict(range=[0, 105]))
-                st.plotly_chart(fig_h, use_container_width=True)
-            else:
-                st.warning("البيانات موجودة لكن التواريخ غير صالحة.")
-        else:
-            st.warning(f"لا توجد بيانات سابقة للاسم: {user_name}")
-            
-            # --- 🛠️ أداة التصحيح (تظهر فقط عند الخطأ) ---
-            with st.expander("🔧 عرض البيانات الخام (للمبرمج)"):
-                st.write("الأسماء الموجودة في الملف:")
-                st.write(df_history['Name'].unique())
-
+# --- 6. عرض التاريخ والمتصدرين ---
 st.markdown("---")
-st.header("🏆 المتصدرين")
-if st.button("تحديث"):
-    df = load_history_data()
-    if not df.empty and 'Score_Eff' in df.columns:
-        top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
-        data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
-        st.table(pd.DataFrame(data))
+if user_name and user_name != "مبادر":
+    st.header(f"📈 المسار التاريخي لـ {user_name}")
+    df_h = load_history_data()
+    if not df_h.empty:
+        user_hist = df_h[df_h['Name'].str.strip() == user_name.strip()].sort_values('Date')
+        if not user_hist.empty:
+            fig_h = go.Figure()
+            fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Eff'], name='الفعالية'))
+            fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Def'], name='المناعة'))
+            fig_h.update_layout(hovermode="x unified")
+            st.plotly_chart(fig_h, use_container_width=True)
+        else:
+            st.info("لا يوجد سجل بيانات لهذا الاسم بعد.")
 
+st.header("🏆 قائمة المتصدرين")
+if st.button("تحديث القائمة"):
+    df_top = load_history_data()
+    if not df_top.empty:
+        top = df_top.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
+        st.table(top)
