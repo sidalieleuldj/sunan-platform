@@ -92,18 +92,26 @@ def load_history_data():
 # --- 🧠 4. المستشار السنني (نسخة Gemini) ---
 def get_ai_consultation(name, eff, def_s, coh, diag):
     try:
-        # سنحاول جلب المفتاح بأكثر من طريقة
-        api_key = st.secrets.get("gemini_key") or st.secrets.get("GEMINI_KEY")
-        
+        api_key = st.secrets.get("gemini_key")
         if not api_key:
-             return f"⚠️ لم نجد المفتاح. الموجود في الأسرار هو: {list(st.secrets.keys())}"
+             return "⚠️ لم يتم العثور على المفتاح في الأسرار."
         
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(f"أنت مستشار حضاري، قدم نصيحة لـ {name} بناءً على درجة فعالية {eff}")
+        
+        # تغيير الموديل إلى النسخة المستقرة الأكثر توافقاً
+        model = genai.GenerativeModel('gemini-pro') 
+        
+        prompt = f"""
+        أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
+        حلل نتائج {name}: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
+        التشخيص الحالي: {diag}.
+        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط تخاطبه فيها باسمه.
+        """
+        
+        response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"❌ خطأ تقني: {str(e)}"
+        return f"❌ خطأ تقني في الموديل: {str(e)}"
 
 # --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
@@ -214,6 +222,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
