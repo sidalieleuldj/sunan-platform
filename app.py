@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -14,55 +13,48 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS (إصلاح السلايدر واتجاه اللوحة) ---
+# --- 2. CSS "الوضع الآمن" (يحل مشكلة النقاط الحمراء) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* الخط العام */
+    /* تطبيق الخط العربي على كل شيء */
     html, body, [class*="css"] {
         font-family: 'Cairo', sans-serif;
     }
 
-    /* النصوص والعناوين: اتجاه يمين */
-    .stMarkdown, p, h1, h2, h3, h4, h5, .stTextInput > label, .stNumberInput > label, .stSelectbox > label {
+    /* هام جداً: إبقاء اتجاه الصفحة LTR لمنع تكسر السلايدر */
+    .stApp {
+        direction: ltr;
+    }
+
+    /* تحويل النصوص والعناوين وحقول الإدخال فقط لليمين */
+    .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
         text-align: right !important;
         direction: rtl !important;
     }
-
-    /* === إصلاح السلايدر (الحل الجذري) === */
-    /* 1. نجعل الحاوية يسارية لكي لا تتطاير الأرقام */
-    div[data-testid="stSlider"] {
-        direction: ltr !important;
-    }
-    /* 2. نجعل النصوص فوق السلايدر يمنية */
-    div[data-testid="stSlider"] > label {
+    
+    /* تنسيق خاص للسلايدر لضبط العنوان */
+    .stSlider > label {
+        width: 100%;
         text-align: right !important;
         direction: rtl !important;
-        width: 100%; 
-        display: flex;
-        justify-content: flex-end;
+        display: block;
     }
-    /* 3. إصلاح مكان الأرقام (التي تحت السلايدر) */
-    div[data-testid="stSlider"] [data-testid="stTickBarMin"],
-    div[data-testid="stSlider"] [data-testid="stTickBarMax"] {
-        font-family: 'Cairo', sans-serif;
-    }
-
-    /* القائمة الجانبية: مكانها يسار، محتواها يمين */
-    section[data-testid="stSidebar"] {
-        left: 0 !important;
-        right: auto !important;
-    }
+    
+    /* تنسيق خاص للقائمة الجانبية ونصوصها */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
         text-align: right !important;
+        direction: rtl !important;
     }
-
-    /* الحقول والأزرار */
+    
+    /* جعل حقول الإدخال تكتب من اليمين */
     input {
         text-align: right !important;
         direction: rtl !important;
     }
+
+    /* تنسيق الأزرار */
     .stButton>button {
         width: 100%;
         background-color: #1F618D;
@@ -70,7 +62,7 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    /* الجداول */
+    /* تنسيق الجدول */
     [data-testid="stDataFrame"] { direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
@@ -103,13 +95,16 @@ def load_history_data():
         try:
             data = sheet.get_all_records()
             df = pd.DataFrame(data)
-            # --- إصلاح البيانات (تحويل النصوص لأرقام) ---
-            # هذا الجزء سيحل مشكلة الترتيب 862 vs 98
-            cols_to_fix = ['Score_Eff', 'Score_Def', 'Score_Coh']
-            for col in cols_to_fix:
-                if col in df.columns:
-                    # تحويل القيم إلى أرقام، وأي خطأ يتحول لصفر
-                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            # --- تنظيف البيانات القوي ---
+            if not df.empty:
+                # التأكد من أن الأعمدة المطلوبة موجودة كأرقام
+                # هذا يحل مشكلة الترتيب الخاطئ (862 بدل 86.2)
+                cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
+                for c in cols:
+                    if c in df.columns:
+                        # تحويل النص إلى رقم، وإجبار الأخطاء لتصبح NaN ثم 0
+                        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
             return df
         except: pass
     return pd.DataFrame()
@@ -129,22 +124,18 @@ def calculate_sunan_scores(data):
     # التماسك
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
     
-    # التشخيص
     if eff < 45: 
         diag = "🛑 ركود حضاري: تستهلك أكثر مما تنتج."
         acts = ["خصص ساعة عمل مركزة.", "قلل التصفح."]
     elif def_s < 45: 
-        diag = "⚠️ جهد مكشوف: إنتاجك عالٍ لكنك مستنزف."
+        diag = "⚠️ جهد مكشوف: مستنزف في ردود الأفعال."
         acts = ["توقف عن الجدال.", "ابنِ محتواك الخاص."]
     elif coh < 45: 
-        diag = "🧩 تشتت الجهد: ذرة قوية لكن تعمل وحيداً."
+        diag = "🧩 تشتت الجهد: ذرة قوية لكن منعزلة."
         acts = ["ابحث عن شريك.", "اربط عملك بهدف."]
     else: 
-        diag = "🌟 حالة متوازنة (الاستواء الحضاري): استمر على هذا المنوال."
-        acts = [
-            "زكاة العلم تعليمه: وجه شخصاً مبتدئاً.",
-            "وثّق تجربتك لتلهم غيرك."
-        ]
+        diag = "🌟 حالة متوازنة (الاستواء الحضاري): استمر."
+        acts = ["زكاة العلم تعليمه.", "وثّق تجربتك."]
         
     return eff, def_s, coh, diag, acts
 
@@ -201,7 +192,7 @@ if st.session_state['res']:
         if acts:
             for a in acts: st.warning(f"💡 {a}")
             
-    if st.button("💾 تدوين النتيجة في السجل"):
+    if st.button("💾 تدوين النتيجة"):
         if user_name and user_name != "مبادر":
             if save_to_google_sheet(user_name, eff, def_s, coh, diag):
                 st.balloons(); st.success(f"تم التسجيل لـ {user_name}")
@@ -210,31 +201,24 @@ if st.session_state['res']:
 
 st.markdown("---")
 
-# --- 6. لوحة المتصدرين (المصححة) ---
+# --- 6. لوحة المتصدرين ---
 st.header("🏆 لوحة الشرف")
-
 if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            # عرض الجدول
+            # عرض آخر 5 نتائج
             st.dataframe(df.tail(5), use_container_width=True)
             
-            # حساب المتصدرين (بعد التأكد من أن القيم أرقام)
+            # لوحة الأوائل
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
-                # نستخدم max لجلب أفضل نتيجة لكل شخص
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
-                
-                st.subheader("🥇 أعلى 3 رواد في الفعالية")
                 c1, c2, c3 = st.columns(3)
                 
-                if len(leaderboard) > 0: 
-                    c1.metric("المركز الأول", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
-                if len(leaderboard) > 1: 
-                    c2.metric("المركز الثاني", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
-                if len(leaderboard) > 2: 
-                    c3.metric("المركز الثالث", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
+                if len(leaderboard) > 0: c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]}%")
+                if len(leaderboard) > 1: c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]}%")
+                if len(leaderboard) > 2: c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]}%")
         except Exception as e:
-            st.warning("حدث خطأ في عرض الترتيب، تأكد من صحة البيانات.")
+            st.error("تأكد من نظافة البيانات في ملف Google Sheet")
     else:
-        st.info("لا توجد بيانات للعرض.")
+        st.info("السجل فارغ.")
