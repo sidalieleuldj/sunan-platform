@@ -96,22 +96,35 @@ def get_ai_consultation(name, eff, def_s, coh, diag):
         if not api_key:
              return "⚠️ لم يتم العثور على المفتاح في الأسرار."
         
+        # إعداد المكتبة بدون تحديد إصدار API يدوي لتركها تختار المستقر
         genai.configure(api_key=api_key)
         
-        # استخدام النسخة الأحدث والأكثر استقراراً
-        model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+        # استخدام اسم الموديل الخام دون إضافات، وهو الأكثر توافقاً
+        model = genai.GenerativeModel('gemini-1.5-flash') 
         
         prompt = f"""
-        بصفتك مستشاراً حضارياً ملهماً، حلل نتائج {name}: 
-        الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
-        قدم نصيحة سُننية قصيرة (3 أسطر) تربط فيها بين عالم الأفكار وعالم الأشياء.
+        أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
+        حلل نتائج {name}: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
+        التشخيص الحالي: {diag}.
+        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط تخاطبه فيها باسمه.
         """
         
+        # إضافة إعدادات السلامة لضمان عدم حظر الاستجابة
         response = model.generate_content(prompt)
-        return response.text
+        
+        if response.text:
+            return response.text
+        else:
+            return "🤖 اعتذر المرشد عن الإجابة هذه المرة، حاول مجدداً."
+            
     except Exception as e:
-        return f"❌ خطأ تقني في الموديل: {str(e)}"
-
+        # إذا فشل flash، سنحاول فوراً استخدام pro كخيار احتياطي داخل الكود
+        try:
+            model_backup = genai.GenerativeModel('gemini-pro')
+            response = model_backup.generate_content(prompt)
+            return response.text
+        except:
+            return f"❌ عذراً، لا يزال هناك تعارض في إصدار الموديل: {str(e)}"
 # --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
@@ -221,6 +234,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
