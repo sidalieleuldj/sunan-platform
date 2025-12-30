@@ -35,32 +35,20 @@ st.markdown("""
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds_dict = st.secrets["service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        # Récupération des secrets
+        creds_info = st.secrets["service_account"]
+        
+        # Correction automatique si les sauts de ligne de la clé privée sont mal interprétés
+        if isinstance(creds_info, dict) and "private_key" in creds_info:
+            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+            
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
-    except: return None
-
-def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
-    sheet = get_google_sheet()
-    if sheet:
-        try:
-            # الترتيب: الاسم، التاريخ، الفعالية، المناعة، التماسك، التشخيص
-            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
-            sheet.append_row(row)
-            return True
-        except: return False
-    return False
-
-def smart_fix_score(val):
-    try:
-        s_val = str(val).replace(',', '.')
-        score = float(s_val)
-        if score > 100: score = score / 10
-        if score > 100: score = 100.0
-        return score
-    except: return 0.0
+    except Exception as e:
+        st.sidebar.error(f"Erreur de connexion : {e}")
+        return None
 
 # --- 🛑 الدالة التي تم إصلاحها جذرياً ---
 def load_history_data():
@@ -209,3 +197,4 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
