@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import re # استيراد مكتبة التعامل مع النصوص المتقدمة
 
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(
@@ -14,24 +13,54 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. CSS ---
+# --- 2. CSS (التصميم المستقر) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; }
-    .stApp { direction: ltr; }
-    .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
-        text-align: right !important; direction: rtl !important;
+    
+    /* الخط العام */
+    html, body, [class*="css"] {
+        font-family: 'Cairo', sans-serif;
     }
+
+    /* 🛑 هام: إبقاء هيكل التطبيق LTR لمنع انهيار السلايدر */
+    .stApp {
+        direction: ltr;
+    }
+
+    /* تحويل النصوص والعناصر الداخلية فقط إلى RTL */
+    .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert, .stDataFrame {
+        text-align: right !important;
+        direction: rtl !important;
+    }
+    
+    /* إصلاح خاص لعناوين السلايدر */
     .stSlider > label {
-        width: 100%; text-align: right !important; direction: rtl !important; display: block;
+        width: 100%;
+        text-align: right !important;
+        direction: rtl !important;
+        display: block;
     }
+    
+    /* القائمة الجانبية */
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] h1 {
-        text-align: right !important; direction: rtl !important;
+        text-align: right !important;
+        direction: rtl !important;
     }
-    input { text-align: right !important; direction: rtl !important; }
-    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
-    [data-testid="stDataFrame"] { direction: rtl; }
+    
+    /* حقول الإدخال */
+    input {
+        text-align: right !important;
+        direction: rtl !important;
+    }
+
+    /* الأزرار */
+    .stButton>button {
+        width: 100%;
+        background-color: #1F618D;
+        color: white;
+        border-radius: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,38 +73,42 @@ def get_google_sheet():
         client = gspread.authorize(creds)
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
-    except: return None
+    except:
+        return None
 
 def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            # نحفظ الأرقام كنصوص مع استبدال النقطة بفاصلة لكي يقرأها جوجل شيت بشكل جميل
-            row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                   str(eff).replace('.', ','), 
-                   str(def_score).replace('.', ','), 
-                   str(coh).replace('.', ','), 
-                   diagnosis]
+            # 🛑 التغيير الأول: نحفظ الرقم كـ STRING بنقطة (.) عادية جداً
+            # هذا يمنع جوجل شيت من التذاكي وتحويله إلى صيغ غريبة
+            row = [
+                name, 
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                str(eff),      # حفظنا الرقم كما هو (مثلاً "86.2")
+                str(def_score), 
+                str(coh), 
+                diagnosis
+            ]
             sheet.append_row(row)
             return True
         except: return False
     return False
 
-# --- دالة التنظيف "النووية" للبيانات ---
-def clean_currency(x):
-    """دالة تحول أي نص رقمي (بفاصلة أو نقطة) إلى رقم عشري حقيقي"""
-    if isinstance(x, (int, float)):
-        return float(x)
-    if isinstance(x, str):
-        # استبدال الفاصلة بالنقطة
-        x = x.replace(',', '.')
-        # إزالة أي رموز غير رقمية ما عدا النقطة
-        # (في حال وجود مسافات أو رموز عملة)
-        try:
-            return float(x)
-        except:
-            return 0.0
-    return 0.0
+# --- دالة التنظيف الصارمة ---
+def force_float_conversion(val):
+    """دالة تجبر أي قيمة على أن تصبح رقماً عشرياً وتصحح الفواصل"""
+    try:
+        # 1. تحويل القيمة لنص أولاً
+        s_val = str(val)
+        
+        # 2. استبدال الفاصلة بالنقطة (لحل مشكلة التنسيق الأوروبي)
+        s_val = s_val.replace(',', '.')
+        
+        # 3. التحويل لرقم عشري
+        return float(s_val)
+    except:
+        return 0.0
 
 def load_history_data():
     sheet = get_google_sheet()
@@ -85,14 +118,16 @@ def load_history_data():
             df = pd.DataFrame(data)
             
             if not df.empty:
-                cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
-                for c in cols:
-                    if c in df.columns:
-                        # تطبيق دالة التنظيف على كل خلية في أعمدة الدرجات
-                        df[c] = df[c].apply(clean_currency)
+                # 🛑 التغيير الثاني: تنظيف الأعمدة بالقوة الجبرية
+                target_cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
+                
+                for col in target_cols:
+                    if col in df.columns:
+                        # نطبق دالة التنظيف على كل خلية في العمود
+                        df[col] = df[col].apply(force_float_conversion)
             return df
         except Exception as e:
-            st.error(f"خطأ البيانات: {e}")
+            st.error(f"حدث خطأ أثناء جلب البيانات: {e}")
     return pd.DataFrame()
 
 # --- 4. محرك السنن ---
@@ -191,20 +226,23 @@ if st.button("🔄 تحديث القائمة"):
     df = load_history_data()
     if not df.empty:
         try:
-            st.dataframe(df.tail(5), use_container_width=True)
+            # عرض الجدول الخام (للتأكد فقط)
+            with st.expander("عرض السجل الكامل"):
+                st.dataframe(df, use_container_width=True)
             
             if 'Name' in df.columns and 'Score_Eff' in df.columns:
-                # ترتيب تنازلي حقيقي بعد التنظيف
+                # الترتيب الآن سيكون دقيقاً 100% لأن البيانات كلها أرقام
                 leaderboard = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
                 
                 c1, c2, c3 = st.columns(3)
+                # نستخدم التنسيق .2f لإظهار منزلتين عشريتين
                 if len(leaderboard) > 0: 
-                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.2f}")
+                    c1.metric("المركز الأول 🥇", leaderboard.index[0], f"{leaderboard.iloc[0]:.2f}%")
                 if len(leaderboard) > 1: 
-                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.2f}")
+                    c2.metric("المركز الثاني 🥈", leaderboard.index[1], f"{leaderboard.iloc[1]:.2f}%")
                 if len(leaderboard) > 2: 
-                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.2f}")
+                    c3.metric("المركز الثالث 🥉", leaderboard.index[2], f"{leaderboard.iloc[2]:.2f}%")
         except Exception as e:
-            st.error(f"خطأ: {e}")
+            st.error(f"خطأ في العرض: {e}")
     else:
-        st.info("السجل فارغ.")
+        st.info("السجل فارغ. قم بتسجيل أول نتيجة!")
