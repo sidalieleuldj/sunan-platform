@@ -91,46 +91,32 @@ def load_history_data():
 
 # --- 🧠 4. المستشار السنني (نسخة Gemini) ---
 def get_ai_consultation(name, eff, def_s, coh, diag):
-    """
-    دالة تتصل بـ Google Gemini لتقديم استشارة حضارية
-    """
-    # التحقق من وجود المفتاح في الأسرار
+    # فحص هل المفتاح موجود أصلاً في الإعدادات
     if "gemini_key" not in st.secrets:
-        return "⚠️ عذراً، لم يتم إعداد مفتاح Gemini API في إعدادات التطبيق."
+        # هذه الرسالة ستظهر إذا لم يجد التطبيق كلمة gemini_key في Secrets
+        return "⚠️ خطأ: لم يتم العثور على 'gemini_key' في إعدادات Secrets. تأكد من كتابة الاسم بالأحرف الصغيرة."
     
     try:
-        # إعداد Gemini
-        genai.configure(api_key=st.secrets["gemini_key"])
+        # الحصول على المفتاح من الأسرار
+        api_key = st.secrets["gemini_key"]
         
-        # نستخدم موديل سريع وذكي
+        # إعداد المكتبة
+        genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
 
-        # بناء الرسالة (Prompt Engineering)
         prompt = f"""
-        تخيل أنك "مستشار في الهندسة الحضارية"، وتجمع بين حكمة مالك بن نبي (شروط النهضة) ومنهجية الطيب برغوث (السننية).
-        
-        لديك مستخدم اسمه: {name}
-        نتائجه الرقمية اليوم هي:
-        1. مؤشر الفعالية (عالم الأشياء والإنجاز): {eff}/100
-        2. مؤشر المناعة (الثبات النفسي والأصالة): {def_s}/100
-        3. مؤشر التماسك (العمل الجماعي): {coh}/100
-        
-        التشخيص الآلي للنظام: {diag}
-        
-        المطلوب:
-        وجه له رسالة قصيرة (3-4 أسطر) وعميقة جداً.
-        - ابدأ بمخاطبته باسمه.
-        - استخدم مصطلحات مثل (عالم الأفكار، عالم الأشياء، التكديس، الدورة الحضارية، السنن).
-        - أعطه نصيحة عملية واحدة تصحح أكبر خلل لديه في الأرقام أعلاه.
-        - كن مشجعاً ولكن حازماً في الحق.
+        أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
+        حلل نتائج {name}: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
+        التشخيص: {diag}.
+        أعطه نصيحة سُننية عميقة في 3 أسطر.
         """
         
-        # إرسال الطلب
         response = model.generate_content(prompt)
         return response.text
         
     except Exception as e:
-        return f"حدث خطأ في الاتصال بالمستشار الذكي: {str(e)}"
+        # إظهار الخطأ التقني الحقيقي (مثل مفتاح غير صالح أو مشكلة شبكة)
+        return f"❌ فشل الاتصال بـ Gemini. الخطأ التقني: {str(e)}"
 
 # --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
@@ -241,4 +227,5 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
