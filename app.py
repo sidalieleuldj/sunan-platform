@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import google.generativeai as genai  # 🧠 مكتبة جوجل Gemini
 
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(
@@ -25,9 +26,20 @@ st.markdown("""
     div[data-testid="stTable"] { direction: rtl; text-align: right; }
     table { width: 100%; text-align: right !important; }
     th, td { text-align: right !important; }
-    .stSlider > label { width: 100%; text-align: right !important; direction: rtl !important; display: block; }
     input { text-align: right !important; direction: rtl !important; }
     .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; }
+    
+    /* تنسيق خاص لرسالة المستشار الذكي */
+    .ai-box {
+        background-color: #e8f4f8;
+        border-right: 5px solid #1F618D;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        color: #2c3e50;
+        font-size: 1.1em;
+        line-height: 1.6;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,7 +58,6 @@ def save_to_google_sheet(name, eff, def_score, coh, diagnosis):
     sheet = get_google_sheet()
     if sheet:
         try:
-            # الترتيب: الاسم، التاريخ، الفعالية، المناعة، التماسك، التشخيص
             row = [name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_score), str(coh), diagnosis]
             sheet.append_row(row)
             return True
@@ -62,44 +73,66 @@ def smart_fix_score(val):
         return score
     except: return 0.0
 
-# --- 🛑 الدالة التي تم إصلاحها جذرياً ---
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
         try:
-            # نستخدم get_all_values بدلاً من records لنتجاهل العناوين الخاطئة
             data = sheet.get_all_values()
-            
-            # تحويل لقائمة باندا
             df = pd.DataFrame(data)
-            
-            # إذا كان الجدول فارغاً تماماً
-            if df.empty:
-                return pd.DataFrame()
-
-            # التأكد من أن لدينا 6 أعمدة على الأقل
-            if len(df.columns) < 6:
-                return pd.DataFrame()
-                
-            # نختار أول 6 أعمدة فقط ونجبر تسميتها (الحل السحري)
+            if df.empty or len(df.columns) < 6: return pd.DataFrame()
             df = df.iloc[:, :6]
             df.columns = ['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis']
-            
-            # تنظيف: حذف الصف الذي يحتوي على كلمة "Name" إذا كان موجوداً (صف العناوين)
             df = df[df['Name'] != 'Name']
-            df = df[df['Name'] != ''] # حذف الصفوف الفارغة
-            
-            # تطبيق إصلاح الأرقام
-            cols = ['Score_Eff', 'Score_Def', 'Score_Coh']
-            for c in cols:
+            for c in ['Score_Eff', 'Score_Def', 'Score_Coh']:
                 df[c] = df[c].apply(smart_fix_score)
-                
             return df
-        except Exception as e:
-            st.error(f"Error loading: {e}")
+        except: pass
     return pd.DataFrame()
 
-# --- 4. محرك السنن ---
+# --- 🧠 4. المستشار السنني (نسخة Gemini) ---
+def get_ai_consultation(name, eff, def_s, coh, diag):
+    """
+    دالة تتصل بـ Google Gemini لتقديم استشارة حضارية
+    """
+    # التحقق من وجود المفتاح في الأسرار
+    if "gemini_key" not in st.secrets:
+        return "⚠️ عذراً، لم يتم إعداد مفتاح Gemini API في إعدادات التطبيق."
+    
+    try:
+        # إعداد Gemini
+        genai.configure(api_key=st.secrets["gemini_key"])
+        
+        # نستخدم موديل سريع وذكي
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # بناء الرسالة (Prompt Engineering)
+        prompt = f"""
+        تخيل أنك "مستشار في الهندسة الحضارية"، وتجمع بين حكمة مالك بن نبي (شروط النهضة) ومنهجية الطيب برغوث (السننية).
+        
+        لديك مستخدم اسمه: {name}
+        نتائجه الرقمية اليوم هي:
+        1. مؤشر الفعالية (عالم الأشياء والإنجاز): {eff}/100
+        2. مؤشر المناعة (الثبات النفسي والأصالة): {def_s}/100
+        3. مؤشر التماسك (العمل الجماعي): {coh}/100
+        
+        التشخيص الآلي للنظام: {diag}
+        
+        المطلوب:
+        وجه له رسالة قصيرة (3-4 أسطر) وعميقة جداً.
+        - ابدأ بمخاطبته باسمه.
+        - استخدم مصطلحات مثل (عالم الأفكار، عالم الأشياء، التكديس، الدورة الحضارية، السنن).
+        - أعطه نصيحة عملية واحدة تصحح أكبر خلل لديه في الأرقام أعلاه.
+        - كن مشجعاً ولكن حازماً في الحق.
+        """
+        
+        # إرسال الطلب
+        response = model.generate_content(prompt)
+        return response.text
+        
+    except Exception as e:
+        return f"حدث خطأ في الاتصال بالمستشار الذكي: {str(e)}"
+
+# --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
@@ -117,7 +150,7 @@ def calculate_sunan_scores(data):
         
     return eff, def_s, coh, diag, acts
 
-# --- 5. الواجهة ---
+# --- 6. واجهة المستخدم ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
@@ -137,7 +170,7 @@ with st.sidebar:
     with st.expander("🤝 التماسك"):
         align = st.slider("وضوح الهدف", 0, 10, 5)
         team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🔍 تحليل")
+    calc_btn = st.button("🔍 تحليل الموقف")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
@@ -156,7 +189,19 @@ if st.session_state['res']:
         st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.info(f"النتيجة: {user_name}\n\n{diag}")
-        for a in acts: st.warning(f"💡 {a}")
+        
+        # --- 🤖 زر استدعاء Gemini ---
+        if st.button("✨ استشارة المرشد السنني (AI)"):
+            with st.spinner('جاري الاتصال بـ Gemini للتحليل...'):
+                advice = get_ai_consultation(user_name, eff, def_s, coh, diag)
+                st.markdown(f"""
+                <div class="ai-box">
+                    <h4>🤖 بصيرة سننية (عبر Gemini):</h4>
+                    <p>{advice}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+             for a in acts: st.warning(f"💡 نصيحة سريعة: {a}")
     
     if st.button("💾 حفظ النتيجة"):
         if user_name != "مبادر":
@@ -164,42 +209,26 @@ if st.session_state['res']:
                 st.balloons(); st.success("تم الحفظ")
         else: st.error("اكتب الاسم")
 
-# --- 6. الرسم البياني (معالجة الأخطاء) ---
+# --- 7. الرسم البياني ---
 if user_name and user_name != "مبادر":
     st.markdown("---")
     st.header(f"📈 المسار التاريخي: {user_name}")
-    
     df_history = load_history_data()
-    
     if not df_history.empty:
-        # تنظيف الأسماء
         df_history['Name_Clean'] = df_history['Name'].astype(str).str.strip()
         target_name = user_name.strip()
-        
         user_hist = df_history[df_history['Name_Clean'] == target_name].copy()
-        
         if not user_hist.empty:
-            # تحويل التاريخ (مع التعامل مع الأخطاء)
             user_hist['Date'] = pd.to_datetime(user_hist['Date'], errors='coerce')
             user_hist = user_hist.dropna(subset=['Date']).sort_values('Date')
-            
             if not user_hist.empty:
                 fig_h = go.Figure()
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Eff'], name='الفعالية', line=dict(color='#1F618D', width=3)))
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Def'], name='المناعة', line=dict(color='#E74C3C', dash='dot')))
                 fig_h.add_trace(go.Scatter(x=user_hist['Date'], y=user_hist['Score_Coh'], name='التماسك', line=dict(color='#27AE60', dash='dot')))
-                
                 fig_h.update_layout(title="تطور الأداء", hovermode="x unified", yaxis=dict(range=[0, 105]))
                 st.plotly_chart(fig_h, use_container_width=True)
-            else:
-                st.warning("البيانات موجودة لكن التواريخ غير صالحة.")
-        else:
-            st.warning(f"لا توجد بيانات سابقة للاسم: {user_name}")
-            
-            # --- 🛠️ أداة التصحيح (تظهر فقط عند الخطأ) ---
-            with st.expander("🔧 عرض البيانات الخام (للمبرمج)"):
-                st.write("الأسماء الموجودة في الملف:")
-                st.write(df_history['Name'].unique())
+        else: st.warning(f"لا توجد بيانات سابقة لـ {user_name}")
 
 st.markdown("---")
 st.header("🏆 المتصدرين")
