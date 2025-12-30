@@ -90,38 +90,44 @@ def load_history_data():
     return pd.DataFrame()
 
 # --- 🧠 4. المستشار السنني (نسخة Gemini) ---
-def get_ai_consultation(name, eff, def_s, coh, diag):
+def get_ai_consultation(name, current_eff, current_def, current_coh, diag, history_df):
     try:
         api_key = st.secrets.get("gemini_key")
-        if not api_key:
-            return "⚠️ لم يتم العثور على المفتاح في الأسرار."
-        
-        # تهيئة المكتبة
         genai.configure(api_key=api_key)
         
-        # جلب قائمة الموديلات المتاحة لحسابك برمجياً لتجنب الخطأ 404
+        # اختيار الموديل المتاح
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        model = genai.GenerativeModel(available_models[0])
         
-        if not available_models:
-            return "❌ لا توجد موديلات متاحة لهذا المفتاح حالياً."
-        
-        # اختيار أول موديل متاح (غالباً سيكون gemini-pro أو gemini-1.5-flash المحدث)
-        model_name = available_models[0]
-        model = genai.GenerativeModel(model_name)
-        
+        # تحويل التاريخ إلى ملخص نصي ليفهمه الذكاء الاصطناعي
+        history_summary = ""
+        if not history_df.empty:
+            # نأخذ آخر 5 سجلات للمستخدم لنعطي الذكاء سياقاً عن تطوره
+            user_history = history_df[history_df['Name'].str.strip() == name.strip()].tail(5)
+            history_summary = user_history[['Date', 'Score_Eff', 'Score_Def', 'Score_Coh']].to_string()
+
         prompt = f"""
-        أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
-        المستخدم: {name}
-        النتائج: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
-        التشخيص: {diag}.
-        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط.
+        أنت "خبير استراتيجي في فقه السنن"، مهمتك تحليل المسار الحضاري لـ {name}.
+        
+        النتائج الحالية:
+        - الفعالية: {current_eff} | المناعة: {current_def} | التماسك: {current_coh}
+        - التشخيص: {diag}
+        
+        السجل التاريخي للمستخدم (لتحليل المنحنى):
+        {history_summary}
+        
+        المطلوب منك:
+        1. قارن النتيجة الحالية بالنتائج السابقة (هل هناك تحسن أم تراجع؟).
+        2. قدم بصيرة سننية تربط بين هذا المسار وبين مفاهيم مالك بن نبي (مثل: القابلية للاستعمار، أو تكديس الأشياء مقابل بناء الأفكار).
+        3. أعطه "واجباً عملياً" واحداً لهذا الأسبوع لضمان استمرار الصعود.
+        
+        اللغة: عربية فصيحة، ملهمة، وعميقة. (4 أسطر كحد أقصى).
         """
         
         response = model.generate_content(prompt)
         return response.text
-
     except Exception as e:
-        return f"❌ فشل الاتصال النهائي: {str(e)}"
+        return f"❌ فشل تحليل المسار التاريخي: {str(e)}"
         
 # --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
@@ -232,6 +238,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
