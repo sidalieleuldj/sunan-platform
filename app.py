@@ -94,37 +94,35 @@ def get_ai_consultation(name, eff, def_s, coh, diag):
     try:
         api_key = st.secrets.get("gemini_key")
         if not api_key:
-             return "⚠️ لم يتم العثور على المفتاح في الأسرار."
+            return "⚠️ لم يتم العثور على المفتاح في الأسرار."
         
-        # إعداد المكتبة بدون تحديد إصدار API يدوي لتركها تختار المستقر
+        # تهيئة المكتبة
         genai.configure(api_key=api_key)
         
-        # استخدام اسم الموديل الخام دون إضافات، وهو الأكثر توافقاً
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        # جلب قائمة الموديلات المتاحة لحسابك برمجياً لتجنب الخطأ 404
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if not available_models:
+            return "❌ لا توجد موديلات متاحة لهذا المفتاح حالياً."
+        
+        # اختيار أول موديل متاح (غالباً سيكون gemini-pro أو gemini-1.5-flash المحدث)
+        model_name = available_models[0]
+        model = genai.GenerativeModel(model_name)
         
         prompt = f"""
         أنت مستشار حضاري خبير في فكر مالك بن نبي والطيب برغوث.
-        حلل نتائج {name}: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
-        التشخيص الحالي: {diag}.
-        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط تخاطبه فيها باسمه.
+        المستخدم: {name}
+        النتائج: الفعالية {eff}، المناعة {def_s}، التماسك {coh}.
+        التشخيص: {diag}.
+        أعطه نصيحة سُننية عملية وعميقة في 3 أسطر فقط.
         """
         
-        # إضافة إعدادات السلامة لضمان عدم حظر الاستجابة
         response = model.generate_content(prompt)
-        
-        if response.text:
-            return response.text
-        else:
-            return "🤖 اعتذر المرشد عن الإجابة هذه المرة، حاول مجدداً."
-            
+        return response.text
+
     except Exception as e:
-        # إذا فشل flash، سنحاول فوراً استخدام pro كخيار احتياطي داخل الكود
-        try:
-            model_backup = genai.GenerativeModel('gemini-pro')
-            response = model_backup.generate_content(prompt)
-            return response.text
-        except:
-            return f"❌ عذراً، لا يزال هناك تعارض في إصدار الموديل: {str(e)}"
+        return f"❌ فشل الاتصال النهائي: {str(e)}"
+        
 # --- 5. محرك السنن ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
@@ -234,6 +232,7 @@ if st.button("تحديث"):
         top = df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(3)
         data = [{"المركز":f"{i+1}","الاسم":n,"الفعالية":f"{s:.1f}%"} for i,(n,s) in enumerate(top.items())]
         st.table(pd.DataFrame(data))
+
 
 
 
