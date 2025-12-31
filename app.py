@@ -5,51 +5,38 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
+# --- إضافة زر التبديل بين الوضعين في القائمة الجانبية ---
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
 
-# --- 2. التصميم الشامل (CSS) - يحفظ كل التعديلات السابقة ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        background-color: #f8f9fa;
-    }
-    .stApp { direction: ltr; }
-    .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
-    
-    /* تصميم السلايدر المطور (الأخضر والذهبي) */
-    div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
-    div[data-baseweb="slider"] > div:first-child > div:first-child {
-        background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
-    }
-    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
+with st.sidebar:
+    st.markdown("---")
+    if st.button("🌓 تبديل الوضع (ليلي/نهاري)"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
 
-    /* أزرار عصرية */
-    .stButton>button {
-        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
-        color: white !important; border-radius: 12px !important; border: none !important;
-        padding: 15px 30px !important; font-weight: 900 !important; transition: 0.3s;
-        box-shadow: 0 4px 15px rgba(30, 86, 49, 0.2);
-    }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
-
-    /* صناديق النتائج والتحدي والذكاء الاصطناعي */
-    .ai-analysis-card {
-        background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
-        padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
-    }
-    .challenge-box {
-        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
-        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px;
-        color: #1b4f72;
-    }
-    .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
-</style>
-""", unsafe_allow_html=True)
+# --- كود CSS الخاص بالوضع الليلي اليدوي ---
+if st.session_state.dark_mode:
+    st.markdown("""
+    <style>
+        .stApp { background-color: #121212 !important; color: #e0e0e0 !important; }
+        .stMarkdown, p, h1, h2, h3, h4, label { color: #ffffff !important; }
+        
+        /* الصناديق في الوضع الليلي */
+        .ai-analysis-card, .challenge-box, .stExpander {
+            background-color: #1e1e1e !important;
+            border: 1px solid #333 !important;
+            color: white !important;
+        }
+        
+        /* السلايدر في الوضع الليلي */
+        div[data-baseweb="slider"] > div:first-child > div:first-child {
+            background: linear-gradient(90deg, #ffd700 0%, #4caf50 100%) !important;
+        }
+        
+        /* الجداول والقوائم */
+        .stTable, [data-testid="stTable"] { background-color: #1e1e1e !important; color: white !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 3. الدوال البرمجية (Logic & Data) ---
 def get_google_sheet():
@@ -195,4 +182,5 @@ if not df_all.empty:
         top.columns = ['المبادر', 'الفعالية %']
         st.table(top)
         if st.button("🔄 تحديث السجل"): st.rerun()
+
 
