@@ -12,17 +12,21 @@ st.set_page_config(page_title="منصة السُّنَن الرقمية", page_i
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # On récupère les secrets en s'assurant que c'est un dictionnaire
-        creds_info = dict(st.secrets["service_account"])
-        # Nettoyage crucial de la clé privée
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
         
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        # On récupère les secrets
+        creds_dict = dict(st.secrets["service_account"])
+        
+        # Nettoyage de la clé (important pour éviter le Short Substrate)
+        if "private_key" in creds_dict:
+            # On s'assure que les sauts de ligne sont bien interprétés
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+            
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        
         sheet_id = "1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE" 
         return client.open_by_key(sheet_id).sheet1
     except Exception as e:
-        # Affiche l'erreur réelle pour le débogage
         st.error(f"Erreur de connexion : {e}")
         return None
 
@@ -104,3 +108,4 @@ if st.session_state['res']:
                 st.error("خطأ في الحفظ")
         else:
             st.error("الرجاء إدخال الاسم")
+
