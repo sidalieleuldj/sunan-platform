@@ -9,14 +9,14 @@ import google.generativeai as genai
 # --- 1. إعدادات الصفحة والذكاء الاصطناعي ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# إعداد Gemini API من Secrets
+# إعداد Gemini API باستخدام المفتاح من Secrets
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 
-# --- 2. التصميم الشامل (CSS) - النسخة الأصلية المطورة ---
+# --- 2. التصميم الشامل (CSS) - النسخة الأصلية المطورة (السلايدر محمي) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
@@ -29,16 +29,16 @@ st.markdown("""
     .stApp { direction: ltr; }
     .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
     
-    /* إعادة تصميم السلايدر المطور (الأخضر والذهبي) */
-    div[role="slider"] { 
-        background-color: #1e5631 !important; 
-        border: 3px solid #c9a44c !important; 
-        height: 20px !important; 
-        width: 20px !important;
+    /* تصميم السلايدر المطور (الأخضر والذهبي) - ثابت ومحمي */
+    div[data-baseweb="slider"] > div:first-child > div:first-child {
+        background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
+        height: 10px !important;
     }
-    div[data-baseweb="slider"] > div:first-child > div:first-child { 
-        background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important; 
-        height: 8px !important;
+    div[role="slider"] {
+        background-color: #1e5631 !important;
+        border: 3px solid #c9a44c !important;
+        height: 22px !important;
+        width: 22px !important;
     }
     .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
 
@@ -50,30 +50,43 @@ st.markdown("""
     }
     .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
 
-    /* صناديق النتائج والتحدي والذكاء الاصطناعي */
-    .ai-analysis-card {
+    /* صناديق التقرير والتحدي */
+    .ai-response-box {
         background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
         padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
     }
     .challenge-box {
-        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
-        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px;
-        color: #1b4f72;
+        background-color: #fcf3cf; border-radius: 15px; padding: 20px;
+        border: 2px solid #c9a44c; margin-top: 20px; color: #1b4f72;
     }
-    .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
+    .task-item { background: rgba(255,255,255,0.7); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-right: 5px solid #1e5631; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. الدوال البرمجية ---
+# --- 3. الدوال البرمجية (الربط بجوجل شيت) ---
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds_info = dict(st.secrets["service_account"])
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        # قراءة البيانات مباشرة من هيكل السيكرت الخاص بك
+        creds_dict = {
+            "type": st.secrets["service_account"]["type"],
+            "project_id": st.secrets["service_account"]["project_id"],
+            "private_key_id": st.secrets["service_account"]["private_key_id"],
+            "private_key": st.secrets["service_account"]["private_key"].replace("\\n", "\n"),
+            "client_email": st.secrets["service_account"]["client_email"],
+            "client_id": st.secrets["service_account"]["client_id"],
+            "auth_uri": st.secrets["service_account"]["auth_uri"],
+            "token_uri": st.secrets["service_account"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["service_account"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["service_account"]["client_x509_cert_url"]
+        }
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        # تأكد من أن ID الملف صحيح
         return client.open_by_key("1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE").sheet1
-    except: return None
+    except Exception as e:
+        st.sidebar.error(f"خطأ في الاتصال بجوجل شيت: {e}")
+        return None
 
 def load_history_data():
     sheet = get_google_sheet()
@@ -89,14 +102,17 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-def get_ai_analysis(user_name, diag, eff, def_s, coh):
+# دالة Gemini الذكية
+def get_gemini_report(user_name, diag, eff, def_s, coh):
     if model:
-        prompt = f"أنت مستشار رقمي حضاري. المستخدم {user_name} لديه تشخيص {diag} وبدرجات: فعالية {eff}%، مناعة {def_s}%، تماسك {coh}%. قدم تحليلاً ملهماً وتحدي أسبوعي من 4 نقاط."
+        prompt = f"""أنت مستشار رقمي. المستخدم {user_name} لديه تشخيص {diag}. 
+        النتائج: فعالية {eff}%، مناعة {def_s}%، تماسك {coh}%. 
+        قدم تحليلاً ملهماً في فقرة، ثم تحدي من 4 نقاط للأربع أسابيع القادمة باللغة العربية الفصحى."""
         try:
-            return model.generate_content(prompt).text
+            response = model.generate_content(prompt)
+            return response.text
         except: pass
-    # تحليل احتياطي في حال عدم وجود API
-    return f"🤖 تحليل ذكي: حالتك هي {diag}. الفعالية ({eff}%) تتطلب منك التركيز على الإنتاج النوعي وتقليل المشتتات الرقمية."
+    return f"🤖 التقرير: حالتك هي {diag}. فعاليتك المرتفعة ({eff}%) تدل على زخم جيد."
 
 def calculate_scores(data):
     raw_points = (data['p_ratio'] * 80) + (data['projects'] * 20)
@@ -105,6 +121,7 @@ def calculate_scores(data):
     total = data['orig'] + data['replies'] + 0.1
     def_s = round(((data['orig'] / total) * 60) + ((data['emotion'] / 10) * 40), 2)
     coh = min(round((data['align'] * 10) * (1.2 if data['team'] else 1.0), 2), 100)
+    
     if eff < 45: diag = "🛑 ركود حضاري"
     elif def_s < 45: diag = "⚠️ جهد مكشوف"
     elif coh < 45: diag = "🧩 تشتت الجهد"
@@ -116,6 +133,7 @@ if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
+    st.header("🎛️ المدخلات")
     user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
     with st.expander("⏱️ الفعالية", expanded=True):
@@ -130,7 +148,7 @@ with st.sidebar:
     with st.expander("🤝 التماسك"):
         align = st.slider("وضوح الغاية", 0, 10, 5)
         team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🚀 تحليل واستشارة ذكية")
+    calc_btn = st.button("🚀 تحليل واستشارة Gemini")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
@@ -140,24 +158,25 @@ if calc_btn:
 
 if st.session_state['res']:
     eff, def_s, coh, diag = st.session_state['res']
-    with st.spinner('يتم الآن استشارة الذكاء الاصطناعي...'):
-        ai_full_report = get_ai_analysis(user_name, diag, eff, def_s, coh)
+    with st.spinner('يتم الآن استشارة Gemini 1.5...'):
+        report = get_gemini_report(user_name, diag, eff, def_s, coh)
     
-    st.markdown(f'<div class="ai-analysis-card"><h3>🤖 التقرير الذكي</h3>{ai_full_report}</div>', unsafe_allow_html=True)
+    # عرض تقرير Gemini
+    st.markdown(f'<div class="ai-response-box"><h3>🤖 التقرير الحضاري (Gemini AI)</h3>{report}</div>', unsafe_allow_html=True)
     
-    col_g, col_t = st.columns([1.5, 1])
-    with col_g:
+    col_main, col_data = st.columns([1.5, 1])
+    with col_main:
         fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
         st.plotly_chart(fig, use_container_width=True)
-    with col_t:
-        st.success(f"المبادر: {user_name} | التشخيص: {diag}")
+    with col_data:
+        st.success(f"الاسم: {user_name} | التشخيص: {diag}")
         if st.button("💾 حفظ النتيجة"):
             sheet = get_google_sheet()
             if sheet:
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
-                st.balloons()
+                st.balloons(); st.success("تم الحفظ!")
 
-# --- الإحصائيات التاريخية ---
+# --- 5. الإحصائيات التاريخية ---
 st.markdown("---")
 df_all = load_history_data()
 if not df_all.empty:
