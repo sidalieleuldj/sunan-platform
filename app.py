@@ -7,39 +7,59 @@ from datetime import datetime
 import google.generativeai as genai
 
 # --- 1. إعدادات الصفحة والذكاء الاصطناعي ---
-st.set_page_config(page_title="منصة السُّنَن الرقمية - Gemini Edition", page_icon="🕌", layout="wide")
+st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
 # إعداد Gemini API من Secrets
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.warning("⚠️ ملاحظة: مفتاح GEMINI_API_KEY غير موجود في Secrets. سيتم استخدام التحليل التقليدي.")
+    model = None
 
-# --- 2. التصميم الشامل (CSS) - محمي ومحفظ بالكامل ---
+# --- 2. التصميم الشامل (CSS) - النسخة الأصلية المطورة ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; background-color: #f8f9fa; }
+    
+    html, body, [class*="css"] { 
+        font-family: 'Cairo', sans-serif; 
+        text-align: right; 
+        background-color: #f8f9fa;
+    }
     .stApp { direction: ltr; }
     .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
     
-    /* تصميم السلايدر المطور */
-    div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
-    div[data-baseweb="slider"] > div:first-child > div:first-child { background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important; }
-    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
-    
-    /* أزرار عصرية */
-    .stButton>button { background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important; color: white !important; border-radius: 12px !important; padding: 15px 30px !important; font-weight: 900 !important; }
-    
-    /* صندوق تحليل Gemini الذكي */
-    .ai-response-box {
-        background: linear-gradient(135deg, #ffffff 0%, #f1f8e9 100%);
-        border-right: 10px solid #1e5631; border-radius: 20px;
-        padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        margin-top: 20px; border: 1px solid #e0e0e0;
+    /* إعادة تصميم السلايدر المطور (الأخضر والذهبي) */
+    div[role="slider"] { 
+        background-color: #1e5631 !important; 
+        border: 3px solid #c9a44c !important; 
+        height: 20px !important; 
+        width: 20px !important;
     }
-    .challenge-box { background-color: #fcf3cf; border-radius: 15px; padding: 25px; border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px; color: #1b4f72; }
+    div[data-baseweb="slider"] > div:first-child > div:first-child { 
+        background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important; 
+        height: 8px !important;
+    }
+    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
+
+    /* الأزرار العصرية */
+    .stButton>button {
+        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
+        color: white !important; border-radius: 12px !important; border: none !important;
+        padding: 15px 30px !important; font-weight: 900 !important; transition: 0.3s;
+    }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
+
+    /* صناديق النتائج والتحدي والذكاء الاصطناعي */
+    .ai-analysis-card {
+        background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
+        padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
+    }
+    .challenge-box {
+        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
+        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px;
+        color: #1b4f72;
+    }
     .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
@@ -69,21 +89,14 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-# دالة الاستعلام من Gemini AI الحقيقي
-def get_gemini_analysis(user_name, diag, eff, def_s, coh):
-    prompt = f"""
-    أنت 'المستشار الحضاري الرقمي لمنصة السنن'. 
-    المستخدم: {user_name}
-    التشخيص: {diag}
-    النتائج: الفعالية {eff}%، المناعة {def_s}%، التماسك {coh}%
-    المطلوب: قدم تحليلاً فلسفياً ملهماً لحالته في فقرة واحدة، ثم اقترح 4 مهام أسبوعية محددة جداً لتحدي الـ 30 يوماً القادم.
-    اجعل الأسلوب فخماً، مهنياً، وباللغة العربية الفصحى.
-    """
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except:
-        return f"🤖 تحليل تقليدي: حالتك هي {diag}. فعاليتك ({eff}%) تتطلب منك التركيز على الإنتاج بدلاً من الاستهلاك."
+def get_ai_analysis(user_name, diag, eff, def_s, coh):
+    if model:
+        prompt = f"أنت مستشار رقمي حضاري. المستخدم {user_name} لديه تشخيص {diag} وبدرجات: فعالية {eff}%، مناعة {def_s}%، تماسك {coh}%. قدم تحليلاً ملهماً وتحدي أسبوعي من 4 نقاط."
+        try:
+            return model.generate_content(prompt).text
+        except: pass
+    # تحليل احتياطي في حال عدم وجود API
+    return f"🤖 تحليل ذكي: حالتك هي {diag}. الفعالية ({eff}%) تتطلب منك التركيز على الإنتاج النوعي وتقليل المشتتات الرقمية."
 
 def calculate_scores(data):
     raw_points = (data['p_ratio'] * 80) + (data['projects'] * 20)
@@ -92,32 +105,34 @@ def calculate_scores(data):
     total = data['orig'] + data['replies'] + 0.1
     def_s = round(((data['orig'] / total) * 60) + ((data['emotion'] / 10) * 40), 2)
     coh = min(round((data['align'] * 10) * (1.2 if data['team'] else 1.0), 2), 100)
-    
     if eff < 45: diag = "🛑 ركود حضاري"
     elif def_s < 45: diag = "⚠️ جهد مكشوف"
     elif coh < 45: diag = "🧩 تشتت الجهد"
     else: diag = "🌟 استواء حضاري"
     return eff, def_s, coh, diag
 
-# --- 4. واجهة المستخدم (Sidebar) ---
+# --- 4. واجهة المستخدم ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
     user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
-    d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
-    p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
-    projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-    quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
-    orig = st.number_input("منشورات أصلية", 0, 50, 1)
-    replies = st.number_input("ردود", 0, 100, 5)
-    emotion = st.slider("الاتزان", 0, 10, 5)
-    align = st.slider("وضوح الغاية", 0, 10, 5)
-    team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🚀 استشارة Gemini AI")
+    with st.expander("⏱️ الفعالية", expanded=True):
+        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
+        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
+        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
+    with st.expander("🛡️ المناعة"):
+        orig = st.number_input("بصمة أصلية", 0, 50, 1)
+        replies = st.number_input("ردود", 0, 100, 5)
+        emotion = st.slider("الاتزان", 0, 10, 5)
+    with st.expander("🤝 التماسك"):
+        align = st.slider("وضوح الغاية", 0, 10, 5)
+        team = st.checkbox("عمل جماعي")
+    calc_btn = st.button("🚀 تحليل واستشارة ذكية")
 
-st.title("🕌 منصة السُّنَن الرقمية - AI Edition")
+st.title("🕌 منصة السُّنَن الرقمية")
 
 if calc_btn:
     vals = {'hours': d_hours, 'p_ratio': p_ratio, 'projects': projects, 'quality': quality, 'orig': orig, 'replies': replies, 'emotion': emotion, 'align': align, 'team': team}
@@ -125,31 +140,24 @@ if calc_btn:
 
 if st.session_state['res']:
     eff, def_s, coh, diag = st.session_state['res']
+    with st.spinner('يتم الآن استشارة الذكاء الاصطناعي...'):
+        ai_full_report = get_ai_analysis(user_name, diag, eff, def_s, coh)
     
-    # الحصول على تحليل Gemini الحقيقي
-    with st.spinner('يتم الآن تحليل بياناتك بواسطة Gemini 1.5...'):
-        full_ai_report = get_gemini_analysis(user_name, diag, eff, def_s, coh)
-    
-    # عرض تقرير الذكاء الاصطناعي في صندوق فخم
-    st.markdown(f"""
-    <div class="ai-response-box">
-        <h3 style="margin-top:0; color:#1e5631;">🤖 التقرير الحضاري الذكي (بواسطة Gemini)</h3>
-        <p style="font-size:1.1em; line-height:1.7;">{full_ai_report}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="ai-analysis-card"><h3>🤖 التقرير الذكي</h3>{ai_full_report}</div>', unsafe_allow_html=True)
     
     col_g, col_t = st.columns([1.5, 1])
     with col_g:
         fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
         st.plotly_chart(fig, use_container_width=True)
     with col_t:
-        st.info(f"المبادر: {user_name} | التشخيص المبدئي: {diag}")
-        if st.button("💾 توثيق النتيجة"):
+        st.success(f"المبادر: {user_name} | التشخيص: {diag}")
+        if st.button("💾 حفظ النتيجة"):
             sheet = get_google_sheet()
-            if sheet and user_name != "مبادر":
+            if sheet:
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
-                st.balloons(); st.success("تم الحفظ!")
+                st.balloons()
 
+# --- الإحصائيات التاريخية ---
 st.markdown("---")
 df_all = load_history_data()
 if not df_all.empty:
