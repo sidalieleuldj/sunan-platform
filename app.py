@@ -8,38 +8,50 @@ from datetime import datetime
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# --- 2. التصميم (CSS المطور والشامل) ---
+# --- 2. التصميم الشامل (CSS) - يحفظ كل التعديلات السابقة ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; background-color: #f8f9fa; }
+    
+    html, body, [class*="css"] { 
+        font-family: 'Cairo', sans-serif; 
+        text-align: right; 
+        background-color: #f8f9fa;
+    }
     .stApp { direction: ltr; }
     .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
     
-    /* تصميم السلايدر المطور */
+    /* تصميم السلايدر المطور (الأخضر والذهبي) */
     div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
     div[data-baseweb="slider"] > div:first-child > div:first-child {
         background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
     }
-
-    /* صندوق التحدي (الهدف الآن) */
-    .challenge-container {
-        background: #fdf2e9; border-radius: 20px; padding: 25px;
-        border: 2px solid #c9a44c; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-        margin-top: 30px; margin-bottom: 30px;
-    }
-    .challenge-title { color: #d35400; font-weight: 900; font-size: 1.5em; margin-bottom: 15px; }
-    .week-task { background: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
+    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
 
     /* أزرار عصرية */
     .stButton>button {
         background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
-        color: white !important; border-radius: 12px !important; padding: 15px !important; font-weight: 900 !important;
+        color: white !important; border-radius: 12px !important; border: none !important;
+        padding: 15px 30px !important; font-weight: 900 !important; transition: 0.3s;
+        box-shadow: 0 4px 15px rgba(30, 86, 49, 0.2);
     }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
+
+    /* صناديق النتائج والتحدي والذكاء الاصطناعي */
+    .ai-analysis-card {
+        background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
+        padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
+    }
+    .challenge-box {
+        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
+        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px;
+        color: #1b4f72;
+    }
+    .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. الدوال (قاعدة البيانات والتحليل) ---
+# --- 3. الدوال البرمجية (Logic & Data) ---
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -64,14 +76,19 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-def get_30_day_tasks(diag):
-    tasks = {
+def ai_logic_analysis(eff, def_s, coh):
+    if eff > 75: return "أنت في مرحلة **النضج الحضاري**. توازنك ممتاز. النصيحة: ابدأ في قيادة مشاريع جماعية."
+    if def_s < 50: return "يوجد **انكشاف دفاعي**. تستهلك أكثر مما تنتج. النصيحة: قلل التفاعل السلبي وركز على المحتوى الأصلي."
+    if coh < 50: return "تعاني من **تشتت البوصلة**. مجهودك قوي لكنه غير مترابط. النصيحة: حدد هدفاً واحداً كبيراً للشهر."
+    return "أداؤك مستقر، لكنك تحتاج لرفع جودة مخرجاتك لتنتقل من الاستهلاك إلى التأثير."
+
+def get_30_day_challenge(diag):
+    challenges = {
         "🛑 ركود حضاري": ["الأسبوع 1: حذف تطبيقات التشتت.", "الأسبوع 2: إنتاج مخرج رقمي واحد يومياً.", "الأسبوع 3: إنهاء مهمة معلقة منذ شهر.", "الأسبوع 4: مراجعة الفرق في الإنجاز."],
         "⚠️ جهد مكشوف": ["الأسبوع 1: الصيام عن الردود الجدلية.", "الأسبوع 2: كتابة تدوينة أسبوعية أصلية.", "الأسبوع 3: تحويل الردود لنصائح بناءة.", "الأسبوع 4: إطلاق مبادرة رقمية خاصة."],
-        "🧩 تشتت الجهد": ["الأسبوع 1: تحديد هدف واحد كبير للشهر.", "الأسبوع 2: تقنية العمل العميق (ساعتين يومياً).", "الأسبوع 3: التخلص من المهام غير الضرورية.", "الأسبوع 4: تقييم التقدم نحو الغاية."],
-        "🌟 استواء حضاري": ["الأسبوع 1: تعليم مهارة لشخص آخر.", "الأسبوع 2: توثيق 'سُنن' عملك الناجحة.", "الأسبوع 3: بناء فريق عمل مبادر.", "الأسبوع 4: التخطيط للمرحلة الكبرى القادمة."]
+        "🧩 تشتت الجهد": ["الأسبوع 1: تحديد هدف واحد كبير للشهر.", "الأسبوع 2: تقنية العمل العميق (ساعتين يومياً).", "الأسبوع 3: التخلص من المهام غير الضرورية.", "الأسبوع 4: تقييم التقدم نحو الغاية."]
     }
-    return tasks.get(diag, ["ابدأ بالتحليل أولاً."])
+    return challenges.get(diag, ["الأسبوع 1: زكاة العلم تعليمه.", "الأسبوع 2: توثيق سُنن عملك.", "الأسبوع 3: بناء فريق عمل.", "الأسبوع 4: التخطيط للمرحلة القادمة."])
 
 def calculate_scores(data):
     raw_points = (data['p_ratio'] * 80) + (data['projects'] * 20)
@@ -86,65 +103,85 @@ def calculate_scores(data):
     else: diag = "🌟 استواء حضاري"
     return eff, def_s, coh, diag
 
-# --- 4. واجهة التحكم ---
+# --- 4. واجهة التحكم (Sidebar) ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
-    user_name = st.text_input("الاسم", "مبادر")
+    st.header("🎛️ لوحة التحكم")
+    user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
-    d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
-    p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
-    projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-    quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
-    orig = st.number_input("منشورات أصلية", 0, 50, 1)
-    replies = st.number_input("ردود", 0, 100, 5)
-    emotion = st.slider("الاتزان", 0, 10, 5)
-    align = st.slider("وضوح الهدف", 0, 10, 5)
-    team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🔍 تحليل وبناء التحدي")
+    with st.expander("⏱️ الفعالية", expanded=True):
+        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
+        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
+        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
+    with st.expander("🛡️ المناعة"):
+        orig = st.number_input("بصمة أصلية", 0, 50, 1)
+        replies = st.number_input("ردود", 0, 100, 5)
+        emotion = st.slider("الاتزان", 0, 10, 5)
+    with st.expander("🤝 التماسك"):
+        align = st.slider("وضوح الغاية", 0, 10, 5)
+        team = st.checkbox("عمل جماعي")
+    calc_btn = st.button("🔍 تحليل وبناء الخطة")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
-# --- 5. عرض التحدي والنتائج (الآن في مكان بارز) ---
+# --- 5. العرض الرئيسي (النتائج + التحدي + الذكاء الاصطناعي) ---
 if calc_btn:
     vals = {'hours': d_hours, 'p_ratio': p_ratio, 'projects': projects, 'quality': quality, 'orig': orig, 'replies': replies, 'emotion': emotion, 'align': align, 'team': team}
     st.session_state['res'] = calculate_scores(vals)
 
 if st.session_state['res']:
     eff, def_s, coh, diag = st.session_state['res']
+    ai_report = ai_logic_analysis(eff, def_s, coh)
+    challenge_tasks = get_30_day_challenge(diag)
     
-    # 1. عرض التحدي فوراً في الأعلى
+    # عرض التحدي أولاً (أهم ميزة)
     st.markdown(f"""
-    <div class="challenge-container">
-        <div class="challenge-title">🚀 مسار الـ 30 يوماً للتغيير (حالة: {diag})</div>
-        {"".join([f'<div class="week-task">📅 {task}</div>' for task in get_30_day_tasks(diag)])}
+    <div class="challenge-box">
+        <h3 style="margin-top:0; color:#d35400;">🚀 مسار الـ 30 يوماً للتغيير (حالة: {diag})</h3>
+        {"".join([f'<div class="task-item">📅 {t}</div>' for t in challenge_tasks])}
     </div>
     """, unsafe_allow_html=True)
     
-    # 2. عرض الرسم البياني والبيانات تحت التحدي
-    c1, c2 = st.columns([1.5, 1])
-    with c1:
-        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
+    col_g, col_t = st.columns([1.5, 1])
+    with col_g:
+        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
+                                       fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=30, b=30))
         st.plotly_chart(fig, use_container_width=True)
-    with c2:
-        st.markdown(f"### النتيجة: {user_name}")
-        st.info(f"الفعالية: {eff}% | المناعة: {def_s}% | التماسك: {coh}%")
-        if st.button("💾 حفظ النتيجة"):
+        
+    with col_t:
+        st.markdown(f"""
+            <div class="ai-analysis-card">
+                <h2 style="color: #1e5631; margin-top: 0;">{user_name}</h2>
+                <h4 style="color: #c9a44c;">التشخيص: {diag}</h4>
+                <hr>
+                <p style="font-size: 1.1em; line-height: 1.6;">🤖 <b>تحليل الذكاء الاصطناعي:</b> {ai_report}</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("💾 توثيق النتيجة في السجل"):
             sheet = get_google_sheet()
             if sheet and user_name != "مبادر":
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
-                st.balloons(); st.success("تم الحفظ!")
+                st.balloons(); st.success("تم الحفظ بنجاح!")
 
-# --- 6. المتصدرون والسجلات ---
+# --- 6. الإحصائيات (دائماً ظاهرة) ---
 st.markdown("---")
-df = load_history_data()
-if not df.empty:
+df_all = load_history_data()
+if not df_all.empty:
     ca, cb = st.columns([1.5, 1])
     with ca:
-        st.subheader("📈 سجل الأداء")
-        u_df = df[df['Name'] == user_name].sort_values('Date')
-        if not u_df.empty: st.line_chart(u_df.set_index('Date')['Score_Eff'])
+        st.subheader(f"📈 مسار تطور: {user_name}")
+        u_df = df_all[df_all['Name'] == user_name].sort_values('Date')
+        if not u_df.empty:
+            fig_h = go.Figure(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], line=dict(color='#1e5631', width=3), fill='tozeroy'))
+            st.plotly_chart(fig_h, use_container_width=True)
     with cb:
         st.subheader("🏆 المتصدرون")
-        st.table(df.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5))
+        top = df_all.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5).reset_index()
+        top.columns = ['المبادر', 'الفعالية %']
+        st.table(top)
+        if st.button("🔄 تحديث السجل"): st.rerun()
