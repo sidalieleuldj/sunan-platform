@@ -11,43 +11,36 @@ st.set_page_config(page_title="منصة السُّنَن الرقمية", page_i
 # --- 2. التصميم الشامل (CSS) - يحفظ كل التعديلات السابقة ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        background-color: #f8f9fa;
-    }
-    .stApp { direction: ltr; }
-    .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
-    
-    /* تصميم السلايدر المطور (الأخضر والذهبي) */
-    div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
+    /* تصميم خلفية السلايدر (المسار) */
     div[data-baseweb="slider"] > div:first-child > div:first-child {
         background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
+        height: 12px !important;
+        border-radius: 10px !important;
     }
-    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
+    
+    /* تصميم المقبض (الكرة التي تتحرك) */
+    div[role="slider"] {
+        background-color: #ffffff !important;
+        border: 4px solid #1e5631 !important;
+        height: 28px !important;
+        width: 28px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
+        transition: transform 0.2s ease-in-out !important;
+    }
+    
+    /* تأثير عند تمرير الماوس فوق المقبض */
+    div[role="slider"]:hover {
+        transform: scale(1.15) !important;
+        cursor: pointer !important;
+    }
 
-    /* أزرار عصرية */
-    .stButton>button {
-        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
-        color: white !important; border-radius: 12px !important; border: none !important;
-        padding: 15px 30px !important; font-weight: 900 !important; transition: 0.3s;
-        box-shadow: 0 4px 15px rgba(30, 86, 49, 0.2);
+    /* تحسين شكل النص فوق السلايدر */
+    .stSlider label {
+        color: #1e5631 !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 10px !important;
     }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
-
-    /* صناديق النتائج والتحدي والذكاء الاصطناعي */
-    .ai-analysis-card {
-        background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
-        padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
-    }
-    .challenge-box {
-        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
-        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px;
-        color: #1b4f72;
-    }
-    .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -195,4 +188,5 @@ if not df_all.empty:
         top.columns = ['المبادر', 'الفعالية %']
         st.table(top)
         if st.button("🔄 تحديث السجل"): st.rerun()
+
 
