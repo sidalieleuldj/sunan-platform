@@ -9,51 +9,38 @@ from datetime import datetime
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
 # --- 2. CSS المطور للعربية ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    
-    /* الخلفية العامة والخط */
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        background-color: #f4f7f6; /* لون خلفية مريح للعين */
-    }
+/* تحسين شكل السلايدر */
+.stSlider [data-baseweb="slider"] {
+    background-color: transparent;
+    padding-top: 20px;
+}
 
-    /* تنسيق الحاويات (Cards) */
-    .stMetric, .stDataFrame, .stTable, div[data-testid="stExpander"] {
-        background-color: white;
-        border-radius: 15px;
-        padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #e0e0e0;
-    }
+/* تغيير لون المسار (الخلفية) */
+.stSlider [data-testid="stTickBar"] {
+    display: none; /* إخفاء النقاط الصغيرة تحت الشريط */
+}
 
-    /* أزرار التحكم */
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%); /* تدرج أخضر إسلامي */
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 10px;
-        font-weight: bold;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(45, 138, 78, 0.3);
-    }
+/* لون الجزء النشط من الشريط (الأخضر) */
+div[data-roles="track"] > div > div {
+    background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
+}
 
-    /* العناوين */
-    h1 { color: #1e5631; border-bottom: 2px solid #c9a44c; padding-bottom: 10px; }
-    h2, h3 { color: #2d8a4e; }
+/* شكل المقبض (الدائرة) */
+div[role="slider"] {
+    background-color: #1e5631 !important;
+    border: 2px solid #c9a44c !important;
+    height: 20px !important;
+    width: 20px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
 
-    /* تحسين القائمة الجانبية */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-left: 1px solid #e0e0e0;
-    }
+/* تحسين تسمية السلايدر (Label) */
+.stSlider label {
+    font-weight: bold !important;
+    color: #1e5631 !important;
+    font-size: 1.1em !important;
+    margin-bottom: 10px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,6 +188,7 @@ if not df_history.empty:
         if st.button("🔄 تحديث"): st.rerun()
         top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
         st.table(top)
+
 
 
 
