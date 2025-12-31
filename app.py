@@ -136,11 +136,23 @@ if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
     c1, c2 = st.columns([1.5, 1])
     with c1:
-        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], 
-                                       theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
-                                       fill='toself', line_color='#1F618D'))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=40, b=40))
-        st.plotly_chart(fig, use_container_width=True)
+    fig = go.Figure(go.Scatterpolar(
+        r=[eff, def_s, coh, eff], 
+        theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
+        fill='toself',
+        fillcolor='rgba(45, 138, 78, 0.3)', # أخضر شفاف
+        line=dict(color='#c9a44c', width=3) # خط ذهبي
+    ))
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor="#eeeeee"),
+            bgcolor="white"
+        ),
+        margin=dict(t=40, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+    st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.info(f"المستخدم: {user_name}\n\nالتشخيص: {diag}")
         for a in acts: st.warning(f"💡 {a}")
@@ -175,4 +187,5 @@ if not df_history.empty:
         if st.button("🔄 تحديث"): st.rerun()
         top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
         st.table(top)
+
 
