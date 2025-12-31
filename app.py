@@ -8,51 +8,48 @@ from datetime import datetime
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# --- 2. CSS المطور للعربية ---
+# --- 2. CSS المتطور (التصميم الفاخر + تحسين السلايدر) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     
-    /* الخلفية العامة والخط */
     html, body, [class*="css"] { 
         font-family: 'Cairo', sans-serif; 
         text-align: right; 
-        background-color: #f4f7f6; /* لون خلفية مريح للعين */
+        background-color: #f8f9fa;
     }
 
-    /* تنسيق الحاويات (Cards) */
-    .stMetric, .stDataFrame, .stTable, div[data-testid="stExpander"] {
-        background-color: white;
-        border-radius: 15px;
-        padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #e0e0e0;
+    /* العناوين والهوية */
+    h1 { color: #1e5631; border-bottom: 3px solid #c9a44c; padding-bottom: 10px; }
+    h2, h3 { color: #2d8a4e; }
+
+    /* تحسين السلايدر (أشرطة التمرير) */
+    .stSlider [data-baseweb="slider"] { padding-top: 20px; }
+    div[data-roles="track"] > div > div {
+        background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
+    }
+    div[role="slider"] {
+        background-color: #1e5631 !important;
+        border: 2px solid #c9a44c !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+    }
+    .stSlider label {
+        font-weight: bold !important;
+        color: #1e5631 !important;
+        font-size: 1.05em !important;
     }
 
     /* أزرار التحكم */
     .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%); /* تدرج أخضر إسلامي */
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 10px;
-        font-weight: bold;
-        transition: 0.3s;
+        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%);
+        color: white; border: none; border-radius: 10px;
+        padding: 12px; font-weight: bold; transition: 0.3s;
     }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(45, 138, 78, 0.3);
-    }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(45, 138, 78, 0.4); }
 
-    /* العناوين */
-    h1 { color: #1e5631; border-bottom: 2px solid #c9a44c; padding-bottom: 10px; }
-    h2, h3 { color: #2d8a4e; }
-
-    /* تحسين القائمة الجانبية */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-left: 1px solid #e0e0e0;
+    /* الحاويات */
+    div[data-testid="stExpander"] {
+        background-color: white; border-radius: 12px; border: 1px solid #e0e0e0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -82,7 +79,6 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-# --- 4. محرك السنن (المنطق الحسابي) ---
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
@@ -99,108 +95,92 @@ def calculate_sunan_scores(data):
     else: diag, acts = "🌟 استواء حضاري", ["زكاة العلم تعليمه.", "وثّق تجربتك."]
     return eff, def_s, coh, diag, acts
 
-# --- 5. واجهة المستخدم (Sidebar) ---
+# --- 4. واجهة المستخدم (Sidebar) ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
-    st.header("🎛️ لوحة التحكم")
-    user_name = st.text_input("الاسم", "مبادر")
+    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
+    st.title("لوحة التحكم")
+    user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
-    with st.expander("⏱️ الفعالية", expanded=True):
+    
+    with st.expander("⏱️ الفعالية والمخرجات", expanded=True):
         d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
         p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
-        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
-    with st.expander("🛡️ المناعة"):
-        orig = st.number_input("منشورات أصلية", 0, 50, 1)
+        projects = st.number_input("مشاريع مكتملة", 0, 50, 0)
+        quality = st.select_slider("جودة العمل", [1, 2, 3, 4, 5], value=3)
+        
+    with st.expander("🛡️ المناعة الرقمية"):
+        orig = st.number_input("بصمة أصلية", 0, 50, 1)
         replies = st.number_input("ردود وتفاعل", 0, 100, 5)
-        emotion = st.slider("الاتزان الانفعالي", 0, 10, 5)
-    with st.expander("🤝 التماسك"):
-        align = st.slider("وضوح الأهداف", 0, 10, 5)
-        team = st.checkbox("ضمن فريق عمل")
+        emotion = st.slider("الثبات الانفعالي", 0, 10, 5)
+        
+    with st.expander("🤝 التماسك والهدف"):
+        align = st.slider("وضوح الغاية", 0, 10, 5)
+        team = st.checkbox("عمل تعاوني")
     
-    calc_btn = st.button("🔍 تحليل النتائج")
+    calc_btn = st.button("🔍 بدء التحليل")
 
+# --- 5. العرض الرئيسي ---
 st.title("🕌 منصة السُّنَن الرقمية")
 
-# تنفيذ التحليل
 if calc_btn:
     vals = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects,
             'quality_score': quality, 'original_posts': orig, 'replies': replies,
             'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
     st.session_state['res'] = calculate_sunan_scores(vals)
 
-# عرض النتائج
 if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
-    
-    # تقسيم العرض إلى عمودين
     c1, c2 = st.columns([1.5, 1])
     
     with c1:
-        # هنا تم إصلاح الإزاحة (Indentation)
         fig = go.Figure(go.Scatterpolar(
             r=[eff, def_s, coh, eff], 
             theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
-            fill='toself',
-            fillcolor='rgba(45, 138, 78, 0.3)', # لون أخضر شفاف
-            line=dict(color='#c9a44c', width=3)   # خط ذهبي
+            fill='toself', fillcolor='rgba(45, 138, 78, 0.2)',
+            line=dict(color='#c9a44c', width=3)
         ))
-        
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 100], gridcolor="#eeeeee"),
-                bgcolor="white"
-            ),
-            margin=dict(t=40, b=40),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)"
-        )
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=40, b=40))
         st.plotly_chart(fig, use_container_width=True)
     
     with c2:
         st.markdown(f"""
-            <div style="background-color: white; padding: 20px; border-radius: 15px; border-right: 5px solid #c9a44c; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <h3 style="color: #1e5631; margin-top: 0;">النتيجة: {user_name}</h3>
-                <p style="font-size: 1.2em; font-weight: bold; color: #2d8a4e;">{diag}</p>
+            <div style="background-color: white; padding: 20px; border-radius: 15px; border-right: 5px solid #c9a44c; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                <h3 style="color: #1e5631; margin-top: 0;">{user_name}</h3>
+                <p style="font-size: 1.3em; font-weight: bold; color: #2d8a4e;">{diag}</p>
             </div>
         """, unsafe_allow_html=True)
-        
-        st.write("") # مسافة
-        for a in acts: 
-            st.success(f"💡 {a}")
+        st.write("")
+        for a in acts: st.success(f"💡 {a}")
     
-    if st.button("💾 حفظ النتيجة في السجل"):
+    if st.button("💾 حفظ النتيجة في قاعدة البيانات"):
         sheet = get_google_sheet()
         if sheet and user_name != "مبادر":
-            row = [user_name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_s), str(coh), diag]
-            sheet.append_row(row)
-            st.success("تم الحفظ بنجاح!")
+            sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
             st.balloons()
-        else: st.error("اكتب اسمك أولاً")
+            st.success("تم تسجيل البيانات في السجل الحضاري!")
 
-# --- 6. الرسوم التاريخية والمتصدرين ---
+# --- 6. الإحصائيات التاريخية ---
 st.markdown("---")
-df_history = load_history_data()
+df_h = load_history_data()
 
-if not df_history.empty:
-    col_a, col_b = st.columns(2)
+if not df_h.empty:
+    col_hist, col_top = st.columns([1.5, 1])
     
-    with col_a:
-        st.header(f"📈 تاريخ: {user_name}")
-        u_df = df_history[df_history['Name'] == user_name].sort_values('Date')
+    with col_hist:
+        st.header(f"📈 مسار: {user_name}")
+        u_df = df_h[df_h['Name'] == user_name].sort_values('Date')
         if not u_df.empty:
             fig_h = go.Figure()
-            fig_h.add_trace(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], name="الفعالية"))
+            fig_h.add_trace(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], name="الفعالية", line=dict(color='#1e5631', width=3)))
+            fig_h.update_layout(hovermode="x unified", paper_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig_h, use_container_width=True)
-        else: st.info("لا بيانات سابقة.")
+        else: st.info("ابدأ بالحفظ لتظهر بياناتك هنا.")
         
-    with col_b:
+    with col_top:
         st.header("🏆 المتصدرون")
-        if st.button("🔄 تحديث"): st.rerun()
-        top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
-        st.table(top)
-
-
-
+        top_scores = df_h.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5).reset_index()
+        top_scores.columns = ['الاسم', 'الفعالية %']
+        st.table(top_scores)
+        if st.button("🔄 تحديث السجل"): st.rerun()
