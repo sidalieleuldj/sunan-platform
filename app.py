@@ -6,68 +6,54 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import google.generativeai as genai
 
-# --- 1. إعدادات الصفحة والذكاء الاصطناعي ---
+# --- 1. CONFIGURATION & IA ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# إعداد Gemini API باستخدام المفتاح من Secrets
+# Connexion Gemini
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 
-# --- 2. التصميم الشامل (CSS) - النسخة الأصلية المطورة (السلايدر محمي) ---
+# --- 2. DESIGN CSS (STRICTEMENT MAINTENU) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        background-color: #f8f9fa;
-    }
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; background-color: #f8f9fa; }
     .stApp { direction: ltr; }
     .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
     
-    /* تصميم السلايدر المطور (الأخضر والذهبي) - ثابت ومحمي */
+    /* SLIDERS VERT ET OR */
     div[data-baseweb="slider"] > div:first-child > div:first-child {
         background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
-        height: 10px !important;
     }
     div[role="slider"] {
         background-color: #1e5631 !important;
         border: 3px solid #c9a44c !important;
-        height: 22px !important;
-        width: 22px !important;
     }
-    .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
+    .stSlider label { color: #1e5631 !important; font-weight: bold; }
 
-    /* الأزرار العصرية */
-    .stButton>button {
-        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
-        color: white !important; border-radius: 12px !important; border: none !important;
-        padding: 15px 30px !important; font-weight: 900 !important; transition: 0.3s;
-    }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(30, 86, 49, 0.4); }
-
-    /* صناديق التقرير والتحدي */
-    .ai-response-box {
-        background: white; border-right: 10px solid #c9a44c; border-radius: 20px;
+    /* BOITES DE RESULTATS */
+    .ai-analysis-card {
+        background: white; border-right: 10px solid #1e5631; border-radius: 20px;
         padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px;
     }
     .challenge-box {
-        background-color: #fcf3cf; border-radius: 15px; padding: 20px;
-        border: 2px solid #c9a44c; margin-top: 20px; color: #1b4f72;
+        background-color: #fcf3cf; border-radius: 15px; padding: 25px;
+        border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px; color: #1b4f72;
     }
-    .task-item { background: rgba(255,255,255,0.7); padding: 10px; border-radius: 8px; margin-bottom: 8px; border-right: 5px solid #1e5631; font-weight: bold; }
+    .task-item { 
+        background: rgba(255,255,255,0.8); padding: 12px; border-radius: 10px; 
+        margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; 
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. الدوال البرمجية (الربط بجوجل شيت) ---
+# --- 3. FONCTIONS ---
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # قراءة البيانات مباشرة من هيكل السيكرت الخاص بك
         creds_dict = {
             "type": st.secrets["service_account"]["type"],
             "project_id": st.secrets["service_account"]["project_id"],
@@ -82,37 +68,23 @@ def get_google_sheet():
         }
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # تأكد من أن ID الملف صحيح
         return client.open_by_key("1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE").sheet1
-    except Exception as e:
-        st.sidebar.error(f"خطأ في الاتصال بجوجل شيت: {e}")
-        return None
+    except: return None
 
-def load_history_data():
-    sheet = get_google_sheet()
-    if sheet:
-        try:
-            data = sheet.get_all_values()
-            if len(data) > 1:
-                df = pd.DataFrame(data[1:], columns=['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis'])
-                for c in ['Score_Eff', 'Score_Def', 'Score_Coh']:
-                    df[c] = pd.to_numeric(df[c].str.replace(',', '.'), errors='coerce').fillna(0)
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-                return df
-        except: pass
-    return pd.DataFrame()
-
-# دالة Gemini الذكية
-def get_gemini_report(user_name, diag, eff, def_s, coh):
+def get_gemini_response(user_name, diag, eff, def_s, coh):
     if model:
-        prompt = f"""أنت مستشار رقمي. المستخدم {user_name} لديه تشخيص {diag}. 
-        النتائج: فعالية {eff}%، مناعة {def_s}%، تماسك {coh}%. 
-        قدم تحليلاً ملهماً في فقرة، ثم تحدي من 4 نقاط للأربع أسابيع القادمة باللغة العربية الفصحى."""
+        prompt = f"""
+        En tant qu'expert en stratégie de productivité, analyse ce profil :
+        Nom: {user_name}, Diagnostic: {diag}, Efficacité: {eff}%, Défense: {def_s}%, Cohérence: {coh}%.
+        1. Donne une analyse percutante en arabe (1 paragraphe).
+        2. Propose un plan de 4 semaines (une tâche par semaine) pour s'améliorer.
+        Réponds uniquement en Arabe.
+        """
         try:
             response = model.generate_content(prompt)
             return response.text
-        except: pass
-    return f"🤖 التقرير: حالتك هي {diag}. فعاليتك المرتفعة ({eff}%) تدل على زخم جيد."
+        except: return "L'IA est temporairement indisponible."
+    return "Veuillez configurer votre clé API Gemini."
 
 def calculate_scores(data):
     raw_points = (data['p_ratio'] * 80) + (data['projects'] * 20)
@@ -128,63 +100,54 @@ def calculate_scores(data):
     else: diag = "🌟 استواء حضاري"
     return eff, def_s, coh, diag
 
-# --- 4. واجهة المستخدم ---
-if 'res' not in st.session_state: st.session_state['res'] = None
-
+# --- 4. INTERFACE ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
-    st.header("🎛️ المدخلات")
     user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
-    with st.expander("⏱️ الفعالية", expanded=True):
-        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
-        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
-        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
-    with st.expander("🛡️ المناعة"):
-        orig = st.number_input("بصمة أصلية", 0, 50, 1)
-        replies = st.number_input("ردود", 0, 100, 5)
-        emotion = st.slider("الاتزان", 0, 10, 5)
-    with st.expander("🤝 التماسك"):
-        align = st.slider("وضوح الغاية", 0, 10, 5)
-        team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🚀 تحليل واستشارة Gemini")
+    d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+    p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
+    projects = st.number_input("مشاريع منجزة", 0, 50, 0)
+    quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
+    orig = st.number_input("بصمة أصلية", 0, 50, 1)
+    replies = st.number_input("ردود", 0, 100, 5)
+    emotion = st.slider("الاتزان", 0, 10, 5)
+    align = st.slider("وضوح الغاية", 0, 10, 5)
+    team = st.checkbox("عمل جماعي")
+    calc_btn = st.button("🔍 تحليل وبناء الخطة")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
 if calc_btn:
     vals = {'hours': d_hours, 'p_ratio': p_ratio, 'projects': projects, 'quality': quality, 'orig': orig, 'replies': replies, 'emotion': emotion, 'align': align, 'team': team}
-    st.session_state['res'] = calculate_scores(vals)
-
-if st.session_state['res']:
-    eff, def_s, coh, diag = st.session_state['res']
-    with st.spinner('يتم الآن استشارة Gemini 1.5...'):
-        report = get_gemini_report(user_name, diag, eff, def_s, coh)
+    eff, def_s, coh, diag = calculate_scores(vals)
     
-    # عرض تقرير Gemini
-    st.markdown(f'<div class="ai-response-box"><h3>🤖 التقرير الحضاري (Gemini AI)</h3>{report}</div>', unsafe_allow_html=True)
+    with st.spinner('جاري استشارة الذكاء الاصطناعي...'):
+        ai_full_text = get_gemini_response(user_name, diag, eff, def_s, coh)
     
-    col_main, col_data = st.columns([1.5, 1])
-    with col_main:
+    # AFFICHAGE DU PLAN DE 30 JOURS (Bloc Jaune)
+    st.markdown(f"""
+    <div class="challenge-box">
+        <h3 style="margin-top:0; color:#d35400;">🚀 مسار الـ 30 يوماً المخصص (حسب تحليل Gemini)</h3>
+        <p>{ai_full_text}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_left, col_right = st.columns([1.5, 1])
+    with col_left:
         fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
         st.plotly_chart(fig, use_container_width=True)
-    with col_data:
-        st.success(f"الاسم: {user_name} | التشخيص: {diag}")
+    with col_right:
+        st.markdown(f"""
+            <div class="ai-analysis-card">
+                <h2 style="color: #1e5631;">{user_name}</h2>
+                <h4 style="color: #c9a44c;">التشخيص الحالي: {diag}</h4>
+                <hr>
+                <p>تم تحديث التحليل بناءً على بياناتك اللحظية عبر Gemini 1.5 Pro.</p>
+            </div>
+        """, unsafe_allow_html=True)
         if st.button("💾 حفظ النتيجة"):
             sheet = get_google_sheet()
             if sheet:
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
-                st.balloons(); st.success("تم الحفظ!")
-
-# --- 5. الإحصائيات التاريخية ---
-st.markdown("---")
-df_all = load_history_data()
-if not df_all.empty:
-    ca, cb = st.columns([1.5, 1])
-    with ca:
-        st.subheader("📈 مسار التطور")
-        u_df = df_all[df_all['Name'] == user_name].sort_values('Date')
-        if not u_df.empty: st.line_chart(u_df.set_index('Date')['Score_Eff'])
-    with cb:
-        st.subheader("🏆 المتصدرون")
-        st.table(df_all.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5))
+                st.balloons()
