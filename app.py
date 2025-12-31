@@ -8,62 +8,30 @@ from datetime import datetime
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# --- 2. CSS المطور والقوي جداً للتصميم ---
+# --- 2. التصميم (CSS المطور لإجبار الألوان الجديدة) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; background-color: #f8f9fa; }
     
-    /* الخطوط والخلفية */
-    html, body, [class*="css"] { 
-        font-family: 'Cairo', sans-serif; 
-        text-align: right; 
-        background-color: #f8f9fa;
-    }
-
-    /* --- تحسين السلايدر (أهم جزء) --- */
-    /* تغيير لون الدائرة المتحركة */
-    div[role="slider"] {
-        background-color: #1e5631 !important; 
-        border: 3px solid #c9a44c !important;
-        box-shadow: 0px 0px 8px rgba(30, 86, 49, 0.4) !important;
-    }
-
-    /* استهداف شريط التمرير النشط (تغيير الأحمر للأخضر والذهبي) */
+    /* تنسيق السلايدر (الأخضر والذهبي) */
+    div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
     div[data-baseweb="slider"] > div:first-child > div:first-child {
         background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important;
     }
+    .stSlider label { color: #1e5631 !important; font-weight: bold; }
 
-    /* تحسين العناوين فوق السلايدر */
-    .stSlider label {
-        color: #1e5631 !important;
-        font-weight: 700 !important;
-        font-size: 1.1em !important;
-    }
-
-    /* --- تحسين الأزرار --- */
+    /* تنسيق الأزرار */
     .stButton>button {
         background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important;
-        color: white !important;
-        border-radius: 12px !important;
-        border: none !important;
-        padding: 15px !important;
-        font-weight: bold !important;
-        transition: all 0.3s ease;
+        color: white !important; border-radius: 12px !important; border: none !important;
+        padding: 10px 20px !important; font-weight: bold !important;
     }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 10px 20px rgba(45, 138, 78, 0.3) !important;
-    }
-
-    /* --- تنسيق الحاويات والبطاقات --- */
-    div[data-testid="stExpander"] {
-        background-color: white !important;
-        border-radius: 15px !important;
-        border: 1px solid #e0e0e0 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-    }
-
-    h1 { color: #1e5631; border-bottom: 3px solid #c9a44c; padding-bottom: 10px; }
+    
+    /* الجداول والحاويات */
+    div[data-testid="stExpander"] { background-color: white !important; border-radius: 15px !important; }
+    .stTable { direction: rtl !important; }
+    h1 { color: #1e5631; border-bottom: 3px solid #c9a44c; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,23 +46,35 @@ def get_google_sheet():
         return client.open_by_key("1uXX-R40l8JQrPX8lcAxWbzxeeSs8Q5zaMF_DZ-R8TmE").sheet1
     except: return None
 
+def load_history_data():
+    sheet = get_google_sheet()
+    if sheet:
+        try:
+            data = sheet.get_all_values()
+            if len(data) > 1:
+                df = pd.DataFrame(data[1:], columns=['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis'])
+                for c in ['Score_Eff', 'Score_Def', 'Score_Coh']:
+                    df[c] = pd.to_numeric(df[c].str.replace(',', '.'), errors='coerce').fillna(0)
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                return df
+        except: pass
+    return pd.DataFrame()
+
 def calculate_sunan_scores(data):
     raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
     quality_factor = data['quality_score'] / 5
     eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
     eff = max(min(round(eff, 2), 100), 5)
-    
     total = data['original_posts'] + data['replies'] + 0.1
     def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
     coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
-    
     if eff < 45: diag, acts = "🛑 ركود حضاري", ["خصص ساعة عمل مركزة.", "قلل التصفح."]
     elif def_s < 45: diag, acts = "⚠️ جهد مكشوف", ["توقف عن الجدال.", "ابنِ محتواك الخاص."]
     elif coh < 45: diag, acts = "🧩 تشتت الجهد", ["ابحث عن شريك.", "اربط عملك بهدف."]
     else: diag, acts = "🌟 استواء حضاري", ["زكاة العلم تعليمه.", "وثّق تجربتك."]
     return eff, def_s, coh, diag, acts
 
-# --- 4. واجهة المستخدم (Sidebar) ---
+# --- 4. واجهة التحكم ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
@@ -102,27 +82,23 @@ with st.sidebar:
     st.header("لوحة التحكم")
     user_name = st.text_input("اسم المستخدم", "مبادر")
     st.markdown("---")
-    
     with st.expander("⏱️ الفعالية", expanded=True):
-        d_hours = st.slider("ساعات التصفح اليومي", 0.0, 16.0, 4.0)
-        p_ratio = st.slider("نسبة الإنتاج الحقيقي", 0.0, 1.0, 0.2)
+        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
         projects = st.number_input("المشاريع المنجزة", 0, 50, 0)
         quality = st.select_slider("جودة المخرجات", [1, 2, 3, 4, 5], value=3)
-        
-    with st.expander("🛡️ المناعة الرقمية"):
-        orig = st.number_input("المنشورات الأصلية", 0, 50, 1)
-        replies = st.number_input("التفاعلات والردود", 0, 100, 5)
-        emotion = st.slider("الهدوء النفسي", 0, 10, 5)
-        
+    with st.expander("🛡️ المناعة"):
+        orig = st.number_input("بصمة أصلية", 0, 50, 1)
+        replies = st.number_input("ردود", 0, 100, 5)
+        emotion = st.slider("الاتزان", 0, 10, 5)
     with st.expander("🤝 التماسك"):
-        align = st.slider("وضوح الهدف", 0, 10, 5)
+        align = st.slider("وضوح الغاية", 0, 10, 5)
         team = st.checkbox("عمل جماعي")
-    
     calc_btn = st.button("🔍 تحليل البيانات")
 
-# --- 5. العرض الرئيسي ---
 st.title("🕌 منصة السُّنَن الرقمية")
 
+# --- 5. العرض الرئيسي (نتائج التحليل) ---
 if calc_btn:
     vals = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects,
             'quality_score': quality, 'original_posts': orig, 'replies': replies,
@@ -132,31 +108,39 @@ if calc_btn:
 if st.session_state['res']:
     eff, def_s, coh, diag, acts = st.session_state['res']
     c1, c2 = st.columns([1.5, 1])
-    
     with c1:
-        # الرسم البياني بألوان ذهبية وخضراء
-        fig = go.Figure(go.Scatterpolar(
-            r=[eff, def_s, coh, eff], 
-            theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
-            fill='toself', fillcolor='rgba(45, 138, 78, 0.2)',
-            line=dict(color='#c9a44c', width=3)
-        ))
+        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
+                                       fill='toself', fillcolor='rgba(45, 138, 78, 0.2)', line=dict(color='#c9a44c', width=3)))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=40, b=40))
         st.plotly_chart(fig, use_container_width=True)
-    
     with c2:
-        st.markdown(f"""
-            <div style="background-color: white; padding: 25px; border-radius: 15px; border-right: 8px solid #c9a44c; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                <h3 style="color: #1e5631; margin-top: 0;">{user_name}</h3>
-                <p style="font-size: 1.4em; font-weight: bold; color: #2d8a4e;">{diag}</p>
-            </div>
-        """, unsafe_allow_html=True)
-        st.write("")
-        for a in acts: st.success(f"💡 {a}")
+        st.info(f"المستخدم: {user_name}\n\nالتشخيص: {diag}")
+        for a in acts: st.warning(f"💡 {a}")
     
-    if st.button("💾 حفظ النتيجة"):
+    if st.button("💾 حفظ النتيجة في السجل"):
         sheet = get_google_sheet()
         if sheet and user_name != "مبادر":
             sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
-            st.balloons()
-            st.success("تم الحفظ بنجاح!")
+            st.success("تم الحفظ!"); st.balloons()
+
+# --- 6. التاريخ والمتصدرون (يظهران دائماً) ---
+st.markdown("---")
+df_history = load_history_data()
+
+if not df_history.empty:
+    col_a, col_b = st.columns([1.5, 1])
+    with col_a:
+        st.header(f"📈 مسار: {user_name}")
+        u_df = df_history[df_history['Name'] == user_name].sort_values('Date')
+        if not u_df.empty:
+            fig_h = go.Figure(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], line=dict(color='#1e5631', width=3), fill='tozeroy'))
+            fig_h.update_layout(title="تطور الفعالية الحضارية", hovermode="x unified")
+            st.plotly_chart(fig_h, use_container_width=True)
+        else: st.info("لا توجد بيانات سابقة لهذا الاسم.")
+    
+    with col_b:
+        st.header("🏆 المتصدرون")
+        top_scores = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5).reset_index()
+        top_scores.columns = ['الاسم', 'الفعالية %']
+        st.table(top_scores)
+        if st.button("🔄 تحديث السجل"): st.rerun()
