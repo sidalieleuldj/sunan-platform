@@ -8,18 +8,21 @@ from datetime import datetime
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
 
-# --- 2. CSS ---
+# --- 2. CSS المطور للعربية ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; }
     .stApp { direction: ltr; }
-    .stMarkdown, p, h1, h2, h3, h4, h5, div[data-testid="stMetricValue"] { text-align: right !important; direction: rtl !important; }
+    .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
+        text-align: right !important; direction: rtl !important;
+    }
     div[data-testid="stTable"] { direction: rtl; }
+    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. وظائف الاتصال ---
+# --- 3. وظائف قاعدة البيانات ---
 def get_google_sheet():
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -33,57 +36,107 @@ def get_google_sheet():
 def load_history_data():
     sheet = get_google_sheet()
     if sheet:
-        data = sheet.get_all_values()
-        if len(data) > 1:
-            df = pd.DataFrame(data[1:], columns=['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis'])
-            # تحويل الأرقام
-            for col in ['Score_Eff', 'Score_Def', 'Score_Coh']:
-                df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce').fillna(0)
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            return df
+        try:
+            data = sheet.get_all_values()
+            if len(data) > 1:
+                df = pd.DataFrame(data[1:], columns=['Name', 'Date', 'Score_Eff', 'Score_Def', 'Score_Coh', 'Diagnosis'])
+                for c in ['Score_Eff', 'Score_Def', 'Score_Coh']:
+                    df[c] = pd.to_numeric(df[c].str.replace(',', '.'), errors='coerce').fillna(0)
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                return df
+        except: pass
     return pd.DataFrame()
 
-# --- 4. واجهة التحكم (Sidebar) ---
-with st.sidebar:
-    st.header("🎛️ الإعدادات")
-    user_name = st.text_input("الاسم", "مبادر")
-    eff_val = st.slider("الفعالية", 0, 100, 50)
-    def_val = st.slider("المناعة", 0, 100, 50)
-    coh_val = st.slider("التماسك", 0, 100, 50)
-    diag_text = "🌟 استواء حضاري" if eff_val > 50 else "🛑 ركود حضاري"
+# --- 4. محرك السنن (المنطق الحسابي) ---
+def calculate_sunan_scores(data):
+    raw_points = (data['production_ratio'] * 80) + (data['completed_projects'] * 20)
+    quality_factor = data['quality_score'] / 5
+    eff = (raw_points * quality_factor) - (data['daily_hours'] * 3) + 15
+    eff = max(min(round(eff, 2), 100), 5)
     
-    if st.button("💾 حفظ النتيجة"):
-        sheet = get_google_sheet()
-        if sheet and user_name != "مبادر":
-            row = [user_name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff_val), str(def_val), str(coh_val), diag_text]
-            sheet.append_row(row)
-            st.success("تم الحفظ!")
-            st.rerun()
+    total = data['original_posts'] + data['replies'] + 0.1
+    def_s = round(((data['original_posts'] / total) * 60) + ((data['emotional_stability'] / 10) * 40), 2)
+    coh = min(round((data['task_alignment'] * 10) * (1.2 if data['is_team'] else 1.0), 2), 100)
+    
+    if eff < 45: diag, acts = "🛑 ركود حضاري", ["خصص ساعة عمل مركزة.", "قلل التصفح."]
+    elif def_s < 45: diag, acts = "⚠️ جهد مكشوف", ["توقف عن الجدال.", "ابنِ محتواك الخاص."]
+    elif coh < 45: diag, acts = "🧩 تشتت الجهد", ["ابحث عن شريك.", "اربط عملك بهدف."]
+    else: diag, acts = "🌟 استواء حضاري", ["زكاة العلم تعليمه.", "وثّق تجربتك."]
+    return eff, def_s, coh, diag, acts
+
+# --- 5. واجهة المستخدم (Sidebar) ---
+if 'res' not in st.session_state: st.session_state['res'] = None
+
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=60)
+    st.header("🎛️ لوحة التحكم")
+    user_name = st.text_input("الاسم", "مبادر")
+    st.markdown("---")
+    with st.expander("⏱️ الفعالية", expanded=True):
+        d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+        p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
+        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
+        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
+    with st.expander("🛡️ المناعة"):
+        orig = st.number_input("منشورات أصلية", 0, 50, 1)
+        replies = st.number_input("ردود وتفاعل", 0, 100, 5)
+        emotion = st.slider("الاتزان الانفعالي", 0, 10, 5)
+    with st.expander("🤝 التماسك"):
+        align = st.slider("وضوح الأهداف", 0, 10, 5)
+        team = st.checkbox("ضمن فريق عمل")
+    
+    calc_btn = st.button("🔍 تحليل النتائج")
 
 st.title("🕌 منصة السُّنَن الرقمية")
 
-# --- 5. عرض الرسوم البيانية التاريخية ---
-st.header(f"📈 المسار التاريخي: {user_name}")
-df_all = load_history_data()
+# تنفيذ التحليل
+if calc_btn:
+    vals = {'daily_hours': d_hours, 'production_ratio': p_ratio, 'completed_projects': projects,
+            'quality_score': quality, 'original_posts': orig, 'replies': replies,
+            'emotional_stability': emotion, 'task_alignment': align, 'is_team': team}
+    st.session_state['res'] = calculate_sunan_scores(vals)
 
-if not df_all.empty:
-    user_df = df_all[df_all['Name'] == user_name].sort_values('Date')
-    if not user_df.empty:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=user_df['Date'], y=user_df['Score_Eff'], name="الفعالية", line=dict(color='#1F618D')))
-        fig.add_trace(go.Scatter(x=user_df['Date'], y=user_df['Score_Def'], name="المناعة", line=dict(color='#E74C3C')))
+# عرض النتائج
+if st.session_state['res']:
+    eff, def_s, coh, diag, acts = st.session_state['res']
+    c1, c2 = st.columns([1.5, 1])
+    with c1:
+        fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], 
+                                       theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], 
+                                       fill='toself', line_color='#1F618D'))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(t=40, b=40))
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("لا توجد بيانات مسجلة لهذا الاسم بعد.")
+    with c2:
+        st.info(f"المستخدم: {user_name}\n\nالتشخيص: {diag}")
+        for a in acts: st.warning(f"💡 {a}")
+    
+    if st.button("💾 حفظ النتيجة في السجل"):
+        sheet = get_google_sheet()
+        if sheet and user_name != "مبادر":
+            row = [user_name, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(eff), str(def_s), str(coh), diag]
+            sheet.append_row(row)
+            st.success("تم الحفظ بنجاح!")
+            st.balloons()
+        else: st.error("اكتب اسمك أولاً")
 
-# --- 6. جدول المتصدرين ---
+# --- 6. الرسوم التاريخية والمتصدرين ---
 st.markdown("---")
-st.header("🏆 قائمة المتصدرين")
-if st.button("🔄 تحديث القائمة"):
-    df_all = load_history_data()
+df_history = load_history_data()
 
-if not df_all.empty:
-    # حساب أعلى نتيجة لكل مستخدم
-    leaderboard = df_all.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).reset_index()
-    leaderboard.columns = ['الاسم', 'أعلى درجة فعالية']
-    st.table(leaderboard.head(5))
+if not df_history.empty:
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.header(f"📈 تاريخ: {user_name}")
+        u_df = df_history[df_history['Name'] == user_name].sort_values('Date')
+        if not u_df.empty:
+            fig_h = go.Figure()
+            fig_h.add_trace(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], name="الفعالية"))
+            st.plotly_chart(fig_h, use_container_width=True)
+        else: st.info("لا بيانات سابقة.")
+        
+    with col_b:
+        st.header("🏆 المتصدرون")
+        if st.button("🔄 تحديث"): st.rerun()
+        top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
+        st.table(top)
