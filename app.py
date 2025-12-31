@@ -4,22 +4,41 @@ import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import google.generativeai as genai
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="منصة السُّنَن الرقمية", page_icon="🕌", layout="wide")
+# --- 1. إعدادات الصفحة والذكاء الاصطناعي ---
+st.set_page_config(page_title="منصة السُّنَن الرقمية - Gemini Edition", page_icon="🕌", layout="wide")
 
-# --- 2. التصميم الشامل (CSS) - محمي بالكامل ---
+# إعداد Gemini API من Secrets
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.warning("⚠️ ملاحظة: مفتاح GEMINI_API_KEY غير موجود في Secrets. سيتم استخدام التحليل التقليدي.")
+
+# --- 2. التصميم الشامل (CSS) - محمي ومحفظ بالكامل ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
     html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; background-color: #f8f9fa; }
     .stApp { direction: ltr; }
     .stMarkdown, p, h1, h2, h3, h4, .stAlert { text-align: right !important; direction: rtl !important; }
+    
+    /* تصميم السلايدر المطور */
     div[role="slider"] { background-color: #1e5631 !important; border: 3px solid #c9a44c !important; }
     div[data-baseweb="slider"] > div:first-child > div:first-child { background: linear-gradient(90deg, #c9a44c 0%, #1e5631 100%) !important; }
     .stSlider label { color: #1e5631 !important; font-weight: bold; font-size: 1.1em; }
+    
+    /* أزرار عصرية */
     .stButton>button { background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%) !important; color: white !important; border-radius: 12px !important; padding: 15px 30px !important; font-weight: 900 !important; }
-    .ai-analysis-card { background: white; border-right: 10px solid #c9a44c; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-top: 20px; }
+    
+    /* صندوق تحليل Gemini الذكي */
+    .ai-response-box {
+        background: linear-gradient(135deg, #ffffff 0%, #f1f8e9 100%);
+        border-right: 10px solid #1e5631; border-radius: 20px;
+        padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        margin-top: 20px; border: 1px solid #e0e0e0;
+    }
     .challenge-box { background-color: #fcf3cf; border-radius: 15px; padding: 25px; border: 2px solid #c9a44c; margin-top: 20px; margin-bottom: 20px; color: #1b4f72; }
     .task-item { background: rgba(255,255,255,0.7); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 5px solid #1e5631; font-weight: bold; }
 </style>
@@ -50,24 +69,21 @@ def load_history_data():
         except: pass
     return pd.DataFrame()
 
-# --- تعديل دالة التحليل لضمان التطابق التام ---
-def ai_logic_analysis(diag, eff, def_s, coh):
-    if diag == "🛑 ركود حضاري":
-        return f"🤖 تحليل الذكاء الاصطناعي: حالة الركود تعني أن محرك الإنتاج متوقف. فعاليتك ({eff}%) تحتاج لتدخل عاجل. ابدأ بالمهام الصغيرة لاستعادة الزخم."
-    elif diag == "⚠️ جهد مكشوف":
-        return f"🤖 تحليل الذكاء الاصطناعي: تشخيص الجهد المكشوف يؤكد أنك تبذل طاقة هائلة في 'ردود الأفعال' بدلاً من 'الأفعال'. نسبتك ({def_s}%) تحذر من ضياع الهوية الرقمية في الجدال."
-    elif diag == "🧩 تشتت الجهد":
-        return f"🤖 تحليل الذكاء الاصطناعي: التشتت يعني أنك تعمل بجد ولكن في دائرة مفرغة. وضوح هدفك ({coh}%) هو مفتاح الحل. ركز على مسار واحد لتخترق حاجز العجز."
-    else:
-        return f"🤖 تحليل الذكاء الاصطناعي: استواء فعاليتك ({eff}%) هو ثمرة توازنك الحضاري. أنت الآن مؤهل للقيادة الرقمية ونشر المعرفة لغيرك."
-
-def get_30_day_challenge(diag):
-    challenges = {
-        "🛑 ركود حضاري": ["الأسبوع 1: حذف تطبيقات التشتت.", "الأسبوع 2: إنتاج مخرج رقمي واحد يومياً.", "الأسبوع 3: إنهاء مهمة معلقة.", "الأسبوع 4: مراجعة الإنجاز."],
-        "⚠️ جهد مكشوف": ["الأسبوع 1: الصيام عن الجدال الرقمي.", "الأسبوع 2: كتابة تدوينة أصلية أسبوعية.", "الأسبوع 3: تحويل الردود لنصائح.", "الأسبوع 4: إطلاق مبادرة خاصة."],
-        "🧩 تشتت الجهد": ["الأسبوع 1: تحديد هدف واحد كبير.", "الأسبوع 2: العمل العميق ساعتين يومياً.", "الأسبوع 3: حذف المهام غير الضرورية.", "الأسبوع 4: تقييم التقدم."]
-    }
-    return challenges.get(diag, ["الأسبوع 1: زكاة العلم تعليمه.", "الأسبوع 2: توثيق سُنن عملك.", "الأسبوع 3: بناء فريق عمل.", "الأسبوع 4: التخطيط للمرحلة القادمة."])
+# دالة الاستعلام من Gemini AI الحقيقي
+def get_gemini_analysis(user_name, diag, eff, def_s, coh):
+    prompt = f"""
+    أنت 'المستشار الحضاري الرقمي لمنصة السنن'. 
+    المستخدم: {user_name}
+    التشخيص: {diag}
+    النتائج: الفعالية {eff}%، المناعة {def_s}%، التماسك {coh}%
+    المطلوب: قدم تحليلاً فلسفياً ملهماً لحالته في فقرة واحدة، ثم اقترح 4 مهام أسبوعية محددة جداً لتحدي الـ 30 يوماً القادم.
+    اجعل الأسلوب فخماً، مهنياً، وباللغة العربية الفصحى.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return f"🤖 تحليل تقليدي: حالتك هي {diag}. فعاليتك ({eff}%) تتطلب منك التركيز على الإنتاج بدلاً من الاستهلاك."
 
 def calculate_scores(data):
     raw_points = (data['p_ratio'] * 80) + (data['projects'] * 20)
@@ -77,19 +93,19 @@ def calculate_scores(data):
     def_s = round(((data['orig'] / total) * 60) + ((data['emotion'] / 10) * 40), 2)
     coh = min(round((data['align'] * 10) * (1.2 if data['team'] else 1.0), 2), 100)
     
-    # توحيد المنطق: الأولوية للأضعف لضمان تطابق التشخيص مع النص
     if eff < 45: diag = "🛑 ركود حضاري"
     elif def_s < 45: diag = "⚠️ جهد مكشوف"
     elif coh < 45: diag = "🧩 تشتت الجهد"
     else: diag = "🌟 استواء حضاري"
     return eff, def_s, coh, diag
 
-# --- 4. واجهة المستخدم ---
+# --- 4. واجهة المستخدم (Sidebar) ---
 if 'res' not in st.session_state: st.session_state['res'] = None
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2331/2331718.png", width=80)
     user_name = st.text_input("اسم المستخدم", "مبادر")
+    st.markdown("---")
     d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
     p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
     projects = st.number_input("مشاريع منجزة", 0, 50, 0)
@@ -99,9 +115,9 @@ with st.sidebar:
     emotion = st.slider("الاتزان", 0, 10, 5)
     align = st.slider("وضوح الغاية", 0, 10, 5)
     team = st.checkbox("عمل جماعي")
-    calc_btn = st.button("🔍 تحليل وبناء الخطة")
+    calc_btn = st.button("🚀 استشارة Gemini AI")
 
-st.title("🕌 منصة السُّنَن الرقمية")
+st.title("🕌 منصة السُّنَن الرقمية - AI Edition")
 
 if calc_btn:
     vals = {'hours': d_hours, 'p_ratio': p_ratio, 'projects': projects, 'quality': quality, 'orig': orig, 'replies': replies, 'emotion': emotion, 'align': align, 'team': team}
@@ -109,25 +125,26 @@ if calc_btn:
 
 if st.session_state['res']:
     eff, def_s, coh, diag = st.session_state['res']
-    ai_report = ai_logic_analysis(diag, eff, def_s, coh) 
-    challenge_tasks = get_30_day_challenge(diag)
     
-    st.markdown(f"""<div class="challenge-box">
-        <h3 style="margin-top:0; color:#d35400;">🚀 مسار الـ 30 يوماً للتغيير (حالة: {diag})</h3>
-        {"".join([f'<div class="task-item">📅 {t}</div>' for t in challenge_tasks])}
-    </div>""", unsafe_allow_html=True)
+    # الحصول على تحليل Gemini الحقيقي
+    with st.spinner('يتم الآن تحليل بياناتك بواسطة Gemini 1.5...'):
+        full_ai_report = get_gemini_analysis(user_name, diag, eff, def_s, coh)
+    
+    # عرض تقرير الذكاء الاصطناعي في صندوق فخم
+    st.markdown(f"""
+    <div class="ai-response-box">
+        <h3 style="margin-top:0; color:#1e5631;">🤖 التقرير الحضاري الذكي (بواسطة Gemini)</h3>
+        <p style="font-size:1.1em; line-height:1.7;">{full_ai_report}</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     col_g, col_t = st.columns([1.5, 1])
     with col_g:
         fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
         st.plotly_chart(fig, use_container_width=True)
     with col_t:
-        st.markdown(f"""<div class="ai-analysis-card">
-            <h2 style="color: #1e5631; margin-top: 0;">{user_name}</h2>
-            <h4 style="color: #c9a44c;">التشخيص: {diag}</h4>
-            <hr><p>🤖 <b>تحليل الذكاء الاصطناعي:</b> {ai_report}</p>
-        </div>""", unsafe_allow_html=True)
-        if st.button("💾 حفظ النتيجة"):
+        st.info(f"المبادر: {user_name} | التشخيص المبدئي: {diag}")
+        if st.button("💾 توثيق النتيجة"):
             sheet = get_google_sheet()
             if sheet and user_name != "مبادر":
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d %H:%M"), str(eff), str(def_s), str(coh), diag])
@@ -138,7 +155,7 @@ df_all = load_history_data()
 if not df_all.empty:
     ca, cb = st.columns([1.5, 1])
     with ca:
-        st.subheader(f"📈 مسار تطور: {user_name}")
+        st.subheader("📈 مسار التطور")
         u_df = df_all[df_all['Name'] == user_name].sort_values('Date')
         if not u_df.empty: st.line_chart(u_df.set_index('Date')['Score_Eff'])
     with cb:
