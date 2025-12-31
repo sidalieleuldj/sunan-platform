@@ -95,10 +95,11 @@ with st.sidebar:
     user_name = st.text_input("الاسم", "مبادر")
     st.markdown("---")
     with st.expander("⏱️ الفعالية", expanded=True):
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
         d_hours = st.slider("ساعات التصفح", 0.0, 16.0, 4.0)
+    with col_s2:
         p_ratio = st.slider("نسبة الإنتاج", 0.0, 1.0, 0.2)
-        projects = st.number_input("مشاريع منجزة", 0, 50, 0)
-        quality = st.select_slider("جودة المخرج", [1, 2, 3, 4, 5], value=3)
     with st.expander("🛡️ المناعة"):
         orig = st.number_input("منشورات أصلية", 0, 50, 1)
         replies = st.number_input("ردود وتفاعل", 0, 100, 5)
@@ -188,6 +189,7 @@ if not df_history.empty:
         if st.button("🔄 تحديث"): st.rerun()
         top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
         st.table(top)
+
 
 
 
