@@ -12,13 +12,48 @@ st.set_page_config(page_title="منصة السُّنَن الرقمية", page_i
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Cairo', sans-serif; text-align: right; }
-    .stApp { direction: ltr; }
-    .stMarkdown, p, h1, h2, h3, h4, h5, span, div[data-testid="stMetricValue"], .stAlert {
-        text-align: right !important; direction: rtl !important;
+    
+    /* الخلفية العامة والخط */
+    html, body, [class*="css"] { 
+        font-family: 'Cairo', sans-serif; 
+        text-align: right; 
+        background-color: #f4f7f6; /* لون خلفية مريح للعين */
     }
-    div[data-testid="stTable"] { direction: rtl; }
-    .stButton>button { width: 100%; background-color: #1F618D; color: white; border-radius: 8px; font-weight: bold; }
+
+    /* تنسيق الحاويات (Cards) */
+    .stMetric, .stDataFrame, .stTable, div[data-testid="stExpander"] {
+        background-color: white;
+        border-radius: 15px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #e0e0e0;
+    }
+
+    /* أزرار التحكم */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(135deg, #1e5631 0%, #2d8a4e 100%); /* تدرج أخضر إسلامي */
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 10px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(45, 138, 78, 0.3);
+    }
+
+    /* العناوين */
+    h1 { color: #1e5631; border-bottom: 2px solid #c9a44c; padding-bottom: 10px; }
+    h2, h3 { color: #2d8a4e; }
+
+    /* تحسين القائمة الجانبية */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-left: 1px solid #e0e0e0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -140,3 +175,4 @@ if not df_history.empty:
         if st.button("🔄 تحديث"): st.rerun()
         top = df_history.groupby('Name')['Score_Eff'].max().sort_values(ascending=False).head(5)
         st.table(top)
+
