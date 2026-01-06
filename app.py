@@ -17,7 +17,6 @@ if 'dark_mode' not in st.session_state:
 bg_color = "#121212" if st.session_state.dark_mode else "#f8f9fa"
 text_color = "#ffffff" if st.session_state.dark_mode else "#000000"
 card_bg = "#1e1e1e" if st.session_state.dark_mode else "#ffffff"
-# Dégradé du slider : Or/Vert en mode nuit, Doré/Vert foncé en mode jour
 slider_track = "linear-gradient(90deg, #ffd700 0%, #4caf50 100%)" if st.session_state.dark_mode else "linear-gradient(90deg, #c9a44c 0%, #1e5631 100%)"
 
 st.markdown(f"""
@@ -86,12 +85,48 @@ def create_gauge(value, title):
             'borderwidth': 2,
             'bordercolor': "#c9a44c",
             'steps': [
-                {'range': [0, 45], 'color': 'rgba(255, 69, 0, 0.2)'},  # Rouge léger
-                {'range': [45, 75], 'color': 'rgba(255, 215, 0, 0.2)'}, # Jaune léger
-                {'range': [75, 100], 'color': 'rgba(30, 86, 49, 0.2)'}], # Vert léger
+                {'range': [0, 45], 'color': 'rgba(255, 69, 0, 0.2)'},
+                {'range': [45, 75], 'color': 'rgba(255, 215, 0, 0.2)'},
+                {'range': [75, 100], 'color': 'rgba(30, 86, 49, 0.2)'}],
         }))
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': text_color, 'family': "Cairo"}, height=220, margin=dict(l=20, r=20, t=40, b=20))
     return fig
+
+def get_badges(eff, def_s, history_df, user):
+    """Logique de Gamification"""
+    badges = []
+    if eff >= 90: badges.append("🎖️ جنرال الفعالية (Score 90+)")
+    if def_s >= 90: badges.append("🛡️ الحصن المنيع (Score 90+)")
+    
+    if not history_df.empty:
+        user_entries = history_df[history_df['Name'] == user]
+        count = len(user_entries)
+        if count >= 1: badges.append("🌱 بداية الغيث (أول تحليل)")
+        if count >= 5: badges.append("🔥 المثابر (5 تحليلات)")
+        if count >= 10: badges.append("💎 الخبير الرقمي (10+ تحليلات)")
+        
+    return badges if badges else ["👋 مرحبًا بك في رحلة الوعي"]
+
+def get_resources(diag):
+    """Pharmacie Numérique : Suggestions selon le diagnostic"""
+    resources = {
+        "🛑 ركود حضاري": [
+            "📖 كتاب: العادات الذرية (James Clear)",
+            "📱 أداة: تطبيق 'Forest' لقتل التشتت",
+            "💡 نصيحة: ابدأ بمهمة واحدة فقط لمدة 5 دقائق"
+        ],
+        "⚠️ جهد مكشوف": [
+            "📖 كتاب: العمل العميق (Cal Newport)",
+            "📺 فيديو: 'دوبامين ديتوكس' (Dopamine Detox)",
+            "💡 نصيحة: ألغِ جميع الإشعارات غير البشرية"
+        ],
+        "🧩 تشتت الجهد": [
+            "📖 كتاب: الشيء الوحيد (Gary Keller)",
+            "📝 أداة: مصفوفة أيزنهاور للأولويات",
+            "💡 نصيحة: اربط كل مهمة بهدفك الأكبر"
+        ]
+    }
+    return resources.get(diag, ["📖 كتاب: رقائق القرآن", "💡 نصيحة: استمر في القياس للتحسين"])
 
 def ai_logic_analysis(eff, def_s, coh):
     if eff < 40: return f"انخفاض حاد في 'الفعالية' ({eff}%). محرك الإنتاج يحتاج لإعادة ضبط فوري."
@@ -152,10 +187,12 @@ with st.sidebar:
 # --- 6. DASHBOARD PRINCIPAL ---
 st.title("🕌 منصة السُّنَن الرقمية | Enterprise")
 
+# Chargement données pour historique et badges
+df_all = load_history_data()
+
 if calc_btn:
-    # Animation de chargement (Toast)
     st.toast('جاري معالجة البيانات...', icon='⏳')
-    time.sleep(0.8)
+    time.sleep(0.5)
     st.toast('تم إنشاء لوحة القيادة!', icon='✅')
 
     # Calculs
@@ -176,6 +213,10 @@ if st.session_state['res']:
     eff, def_s, coh, diag = st.session_state['res']
     ai_report = ai_logic_analysis(eff, def_s, coh)
     challenge_tasks = get_30_day_challenge(diag)
+    
+    # Calcul des badges et ressources
+    my_badges = get_badges(eff, def_s, df_all, user_name)
+    my_resources = get_resources(diag)
 
     # --- SECTION 1: JAUGES (KPIs) ---
     st.markdown("### 📊 مؤشرات الأداء الحيوية")
@@ -184,7 +225,21 @@ if st.session_state['res']:
     with k2: st.plotly_chart(create_gauge(def_s, "المناعة"), use_container_width=True)
     with k3: st.plotly_chart(create_gauge(coh, "التماسك"), use_container_width=True)
 
-    # --- SECTION 2: CHALLENGE & RADAR ---
+    # --- SECTION 2: GAMIFICATION & RESSOURCES (NOUVEAU) ---
+    st.markdown("---")
+    col_badge, col_res = st.columns(2)
+    
+    with col_badge:
+        st.subheader("🎖️ لوحة الإنجازات")
+        for b in my_badges:
+            st.success(b) # Affichage vert
+            
+    with col_res:
+        st.subheader(f"💊 صيدلية الحلول ({diag})")
+        for r in my_resources:
+            st.info(r) # Affichage bleu
+
+    # --- SECTION 3: CHALLENGE & RADAR ---
     st.markdown("---")
     col_c, col_r = st.columns([1.2, 1])
     
@@ -196,12 +251,11 @@ if st.session_state['res']:
         </div>
         """, unsafe_allow_html=True)
         
-        # Bouton Téléchargement Rapport
-        report_txt = f"تقرير السنن الرقمية\nالمستخدم: {user_name}\nالتاريخ: {datetime.now().date()}\n---\nالنتائج:\nالفعالية: {eff}%\nالمناعة: {def_s}%\nالتماسك: {coh}%\nالخطة المقترحة: {challenge_tasks}"
+        # Bouton Téléchargement
+        report_txt = f"تقرير السنن الرقمية\nالمستخدم: {user_name}\nالتاريخ: {datetime.now().date()}\n---\nالنتائج:\nالفعالية: {eff}%\nالمناعة: {def_s}%\nالتماسك: {coh}%\nالإنجازات: {', '.join(my_badges)}"
         st.download_button("📥 تحميل التقرير الكامل (TXT)", data=report_txt, file_name=f"Sunan_Report_{user_name}.txt")
 
     with col_r:
-        # Radar Chart Transparent
         fig = go.Figure(go.Scatterpolar(r=[eff, def_s, coh, eff], theta=['الفعالية', 'المناعة', 'التماسك', 'الفعالية'], fill='toself', fillcolor='rgba(30, 86, 49, 0.2)', line=dict(color='#c9a44c', width=4)))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color=text_color))
         st.plotly_chart(fig, use_container_width=True)
@@ -216,7 +270,6 @@ if st.session_state['res']:
 
 # --- 7. HISTORIQUE ---
 st.markdown("---")
-df_all = load_history_data()
 if not df_all.empty:
     ca, cb = st.columns([2, 1])
     with ca:
