@@ -219,26 +219,65 @@ if st.session_state['res']:
                 sheet.append_row([user_name, datetime.now().strftime("%Y-%m-%d"), str(eff), str(def_s), str(coh), diag])
                 st.balloons(); st.success("تم التوثيق!")
 
-# --- 7. RANKING RELATIF (NOUVEAU) ---
+# --- 7. RANKING RELATIF & HISTORIQUE (CORRIGÉ) ---
 st.markdown("---")
 if not df_all.empty:
     st.subheader("📊 موقعك مقارنة بالجيل الرقمي")
-    u_df = df_all[df_all['Name'] == user_name]
     
-    # Calcul des percentiles
+    # Filtrage sécurisé (supprime les espaces inutiles)
+    clean_user = user_name.strip()
+    u_df = df_all[df_all['Name'] == clean_user].copy()
+    
+    # Calcul des moyennes globales
     avg_cohort = df_all['Score_Eff'].mean()
-    my_max = u_df['Score_Eff'].max() if not u_df.empty else 0
     
+    # 1. Comparaison (Ranking)
     col_rank1, col_rank2 = st.columns(2)
     with col_rank1:
         st.info(f"متوسط فعالية الجيل: {int(avg_cohort)}%")
+    
     with col_rank2:
-        if my_max > avg_cohort:
-            st.success(f"أنت تتفوق على المتوسط بـ +{int(my_max - avg_cohort)}% 🚀")
+        if not u_df.empty:
+            my_max = u_df['Score_Eff'].max()
+            diff = int(my_max - avg_cohort)
+            if diff > 0:
+                st.success(f"أنت تتفوق على المتوسط بـ +{diff}% 🚀")
+            else:
+                st.warning(f"تحتاج لزيادة الجهد لتلحق بالركب ({diff}%)")
         else:
-            st.warning(f"تحتاج لزيادة الجهد لتلحق بالركب (-{int(avg_cohort - my_max)}%)")
+            st.warning("سجل بياناتك الأولى لتظهر في التصنيف")
 
-    # Graphique historique
-    fig_h = go.Figure(go.Scatter(x=u_df['Date'], y=u_df['Score_Eff'], line=dict(color='#c9a44c', width=3), fill='tozeroy', fillcolor='rgba(30, 86, 49, 0.1)'))
-    fig_h.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color=text_color), yaxis=dict(range=[0, 100]), title="مسارك التاريخي")
-    st.plotly_chart(fig_h, use_container_width=True)
+    # 2. Graphique Historique (CORRIGÉ)
+    if not u_df.empty:
+        # TRI OBLIGATOIRE par date pour éviter le chaos visuel
+        u_df = u_df.sort_values('Date')
+        
+        fig_h = go.Figure()
+        
+        # Ajout de la courbe avec 'lines+markers' pour voir même un seul point
+        fig_h.add_trace(go.Scatter(
+            x=u_df['Date'], 
+            y=u_df['Score_Eff'],
+            mode='lines+markers', # Correction critique : affiche les points même s'il n'y en a qu'un
+            name='الفعالية',
+            line=dict(color='#c9a44c', width=3),
+            marker=dict(size=8, color='#1e5631'), # Points verts sur ligne dorée
+            fill='tozeroy', 
+            fillcolor='rgba(201, 164, 76, 0.1)'
+        ))
+
+        fig_h.update_layout(
+            title="📈 مسار تطورك التاريخي",
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)', 
+            font=dict(color=text_color, family="Cairo"),
+            yaxis=dict(range=[0, 100], title="نقطة الفعالية"),
+            xaxis=dict(title="التاريخ"),
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig_h, use_container_width=True)
+    else:
+        st.info("👋 لا توجد بيانات تاريخية لهذا الاسم بعد. اضغط على 'حفظ' لبدء الرسم البياني.")
+else:
+    st.warning("⚠️ قاعدة البيانات فارغة حالياً.")
+
