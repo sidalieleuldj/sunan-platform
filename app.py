@@ -125,7 +125,7 @@ with st.sidebar:
     st.markdown("---")
     
     st.markdown("### 🧠 المعايير السننية")
-    idea_focus = st.select_slider("💡 محور التركيز (بنابي)", options=["عالم الأشياء", "عالم الأشخاص", "عالم الأفكار"], value="عالم الأشخاص")
+    idea_focus = st.select_slider("💡 محور التركيز (بن نبي)", options=["عالم الأشياء", "عالم الأشخاص", "عالم الأفكار"], value="عالم الأشخاص")
     accumulation = st.slider("🧱 التراكمية (برغوث)", 0, 10, 5, help="هل يبني يومك على أمسك؟")
 
     with st.expander("⚙️ المعايير الرقمية", expanded=False):
@@ -280,4 +280,5 @@ if not df_all.empty:
         st.info("👋 لا توجد بيانات تاريخية لهذا الاسم بعد. اضغط على 'حفظ' لبدء الرسم البياني.")
 else:
     st.warning("⚠️ قاعدة البيانات فارغة حالياً.")
+
 
